@@ -1,0 +1,13 @@
+[project]
+name = "thingies"
+version = "0.1.0"
+description = "Terminal interface for Things3"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "click>=8.2.1",
+    "rich>=14.0.0",
+]
+
+[project.scripts]
+thingies = "thingies.cli:cli"
