@@ -108,9 +108,12 @@ def list(ctx, status, area, project, tag, today):
             FROM TMTask t
             LEFT JOIN TMArea a ON t.area = a.uuid
             LEFT JOIN TMTask p ON t.project = p.uuid AND p.type = 1 AND p.trashed = 0
+            LEFT JOIN TMTask h ON t.heading = h.uuid
+            LEFT JOIN TMTask hp ON h.project = hp.uuid AND hp.type = 1
             LEFT JOIN TMTaskTag tt ON t.uuid = tt.tasks
             LEFT JOIN TMTag tag ON tt.tags = tag.uuid
-            WHERE t.type = 0 AND t.trashed = 0
+            WHERE t.type = 0 AND t.trashed = 0 
+                AND (h.uuid IS NULL OR hp.uuid IS NULL OR hp.trashed = 0)
         """
 
         conditions = []
@@ -347,7 +350,11 @@ def search(ctx, search_term, in_notes):
             FROM TMTask t
             LEFT JOIN TMArea a ON t.area = a.uuid
             LEFT JOIN TMTask p ON t.project = p.uuid AND p.type = 1 AND p.trashed = 0
-            WHERE t.trashed = 0 AND (
+            LEFT JOIN TMTask h ON t.heading = h.uuid
+            LEFT JOIN TMTask hp ON h.project = hp.uuid AND hp.type = 1
+            WHERE t.trashed = 0 
+                AND (h.uuid IS NULL OR hp.uuid IS NULL OR hp.trashed = 0)
+                AND (
                 LOWER(t.title) LIKE LOWER(?)
         """
 
