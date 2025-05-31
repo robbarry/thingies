@@ -107,7 +107,7 @@ def list(ctx, status, area, project, tag, today):
                 GROUP_CONCAT(tag.title, ', ') as tags
             FROM TMTask t
             LEFT JOIN TMArea a ON t.area = a.uuid
-            LEFT JOIN TMTask p ON t.project = p.uuid AND p.type = 1
+            LEFT JOIN TMTask p ON t.project = p.uuid AND p.type = 1 AND p.trashed = 0
             LEFT JOIN TMTaskTag tt ON t.uuid = tt.tasks
             LEFT JOIN TMTag tag ON tt.tags = tag.uuid
             WHERE t.type = 0 AND t.trashed = 0
@@ -346,7 +346,7 @@ def search(ctx, search_term, in_notes):
                 a.title as area_name
             FROM TMTask t
             LEFT JOIN TMArea a ON t.area = a.uuid
-            LEFT JOIN TMTask p ON t.project = p.uuid AND p.type = 1
+            LEFT JOIN TMTask p ON t.project = p.uuid AND p.type = 1 AND p.trashed = 0
             WHERE t.trashed = 0 AND (
                 LOWER(t.title) LIKE LOWER(?)
         """
