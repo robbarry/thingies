@@ -1,79 +1,69 @@
-# Thingies - Terminal Interface for Things3
+# Thingies
 
-A Python CLI tool for interacting with the Things3 task management app database.
+A Go CLI for Things 3 with full CRUD access.
 
-## Installation
+## Install
 
 ```bash
-uv pip install -e .
+make build
+ln -s $(pwd)/bin/thingies ~/bin/thingies  # or copy to /usr/local/bin
 ```
 
 ## Usage
 
-### Basic Commands
-
 ```bash
-# List all incomplete tasks
-thingies list
+# Today's tasks
+thingies today
 
-# List completed tasks
-thingies list --status completed
+# Inbox
+thingies inbox
 
-# List tasks in Today view
-thingies list --today
+# Hierarchical view
+thingies snapshot
 
-# Filter by project or area
-thingies list --project "Work" --area "Home"
+# Search
+thingies search "keyword"
+thingies search "keyword" --in-notes
 
-# List all projects
-thingies projects
+# List/filter tasks
+thingies tasks list
+thingies tasks list --today
+thingies tasks list --project "Bills"
+thingies tasks list --area "Work"
+thingies tasks list --status completed
 
-# List all areas
-thingies areas
+# Task CRUD
+thingies tasks show <uuid>
+thingies tasks create "New task" --when today
+thingies tasks update <uuid> --notes "Updated notes"
+thingies tasks complete <uuid>
+thingies tasks delete <uuid>
 
-# List all tags
-thingies tags
+# Projects
+thingies projects list
+thingies projects show <uuid>
+thingies projects create "New project" --area "Work"
+thingies projects update <uuid> --notes "# Markdown supported"
+thingies projects complete <uuid>
+thingies projects delete <uuid>
 
-# Search tasks
-thingies search "meeting"
-thingies search "budget" --in-notes
-```
-
-### Output Formats
-
-```bash
-# Human-readable output (default)
-thingies list
+# Areas & Tags
+thingies areas list
+thingies areas show <uuid>
+thingies tags list
 
 # JSON output
-thingies --json list
+thingies --json today
+thingies --json tasks list
 ```
 
-### Custom Database Location
+## How It Works
 
-```bash
-# Use a specific database file
-thingies --db /path/to/database.sqlite list
-```
+- **Reads**: Direct SQLite access (fast, no app launch)
+- **Creates**: Things URL scheme (`things:///add`)
+- **Updates/Deletes**: AppleScript via `osascript`
 
-## Features
+## Requirements
 
-- **Read-only access** to Things3 database
-- Human-readable tables with rich formatting
-- JSON output for scripting
-- Search by title and notes
-- Filter by status, area, project, and tags
-- View task counts for projects and areas
-
-## Database Location
-
-By default, thingies looks for the Things3 database at:
-```
-~/Library/Group Containers/JLMPQHK86H.com.culturedcode.ThingsMac/ThingsData-*/Things Database.thingsdatabase/main.sqlite
-```
-
-## Safety
-
-- Always uses read-only database connections
-- Things3 must be closed before accessing the database
-- Recommend backing up your database before use
+- macOS with Things 3 installed
+- Go 1.21+ (for building)
