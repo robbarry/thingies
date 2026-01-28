@@ -85,10 +85,6 @@ func scanProjects(rows *sql.Rows) ([]models.Project, error) {
 	return projects, nil
 }
 
-// thingsDateEpoch is the epoch for Things 3 startDate/deadline fields.
-// Things uses Nov 11, 2021 00:00:00 UTC as the reference date for these fields.
-const thingsDateEpoch = 1636588800
-
 // timestampToNullTime converts a Unix timestamp to sql.NullTime
 // Used for creationDate, userModificationDate, stopDate which are Unix timestamps
 func timestampToNullTime(ts sql.NullFloat64) sql.NullTime {
@@ -102,15 +98,24 @@ func timestampToNullTime(ts sql.NullFloat64) sql.NullTime {
 }
 
 // thingsDateToNullTime converts Things date fields (startDate, deadline) to sql.NullTime
-// These fields use a different epoch than standard Unix time
+// These fields are binary-packed dates, not timestamps:
+//   - Bits 16-26: Year (11 bits)
+//   - Bits 12-15: Month (4 bits)
+//   - Bits 7-11: Day (5 bits)
 func thingsDateToNullTime(ts sql.NullFloat64) sql.NullTime {
 	if !ts.Valid || ts.Float64 == 0 {
 		return sql.NullTime{}
 	}
-	// Convert from Things date epoch to Unix epoch
-	unixTime := int64(ts.Float64) + thingsDateEpoch
+
+	packed := int(ts.Float64)
+
+	// Extract year, month, day from packed bits
+	year := (packed & 0x7FF0000) >> 16  // bits 16-26
+	month := (packed & 0xF000) >> 12    // bits 12-15
+	day := (packed & 0xF80) >> 7        // bits 7-11
+
 	return sql.NullTime{
-		Time:  time.Unix(unixTime, 0),
+		Time:  time.Date(year, time.Month(month), day, 0, 0, 0, 0, time.UTC),
 		Valid: true,
 	}
 }
