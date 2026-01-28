@@ -81,20 +81,19 @@ func UpdateTask(params TaskUpdateParams) error {
 	}
 	if params.When != "" {
 		switch params.When {
-		case "today":
+		case "today", "evening":
+			// Note: "evening" just moves to Today; Things 3 doesn't expose evening scheduling via AppleScript
 			statements = append(statements, `move theTodo to list "Today"`)
-		case "evening":
-			statements = append(statements, `move theTodo to list "Today"`)
-			statements = append(statements, `set activation date of theTodo to current date`)
 		case "tomorrow":
-			statements = append(statements, `set activation date of theTodo to (current date) + 1 * days`)
+			statements = append(statements, `move theTodo to list "Tomorrow"`)
 		case "anytime":
 			statements = append(statements, `move theTodo to list "Anytime"`)
 		case "someday":
 			statements = append(statements, `move theTodo to list "Someday"`)
 		default:
-			// Assume it's a date in YYYY-MM-DD format
-			statements = append(statements, fmt.Sprintf(`set activation date of theTodo to date "%s"`, params.When))
+			// Specific dates (YYYY-MM-DD) cannot be set via AppleScript
+			// The activation date property is read-only
+			return fmt.Errorf("cannot set specific date '%s' via AppleScript; Things 3 activation date is read-only. Use 'today', 'tomorrow', 'anytime', or 'someday' instead", params.When)
 		}
 	}
 	if params.TagNames != "" {
