@@ -26,7 +26,7 @@ var updateCmd = &cobra.Command{
 func init() {
 	updateCmd.Flags().StringVar(&updateTitle, "title", "", "New title")
 	updateCmd.Flags().StringVar(&updateNotes, "notes", "", "New notes (replaces existing)")
-	updateCmd.Flags().StringVar(&updateWhen, "when", "", "When to schedule (today, tomorrow, evening, anytime, someday, or YYYY-MM-DD)")
+	updateCmd.Flags().StringVar(&updateWhen, "when", "", "When to schedule (today, tomorrow, evening, anytime, or someday)")
 	updateCmd.Flags().StringVar(&updateDeadline, "deadline", "", "Due date (YYYY-MM-DD)")
 	updateCmd.Flags().StringVar(&updateTags, "tags", "", "Tags (comma-separated, replaces existing)")
 }
