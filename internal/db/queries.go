@@ -572,9 +572,12 @@ func (db *ThingsDB) GetInboxTasks() ([]models.Task, error) {
 	return scanTasks(rows)
 }
 
-// GetAnytimeTasks returns anytime tasks (start=1)
+// GetAnytimeTasks returns anytime tasks:
+// - Tasks with start=1 (pure Anytime)
+// - Tasks with start=2 AND startDate <= today (Someday tasks that are now available)
 func (db *ThingsDB) GetAnytimeTasks() ([]models.Task, error) {
-	query := `
+	todayPacked := TodayPackedDate()
+	query := fmt.Sprintf(`
 		SELECT
 			t.uuid,
 			t.title,
@@ -604,12 +607,12 @@ func (db *ThingsDB) GetAnytimeTasks() ([]models.Task, error) {
 		LEFT JOIN TMTaskTag tt ON t.uuid = tt.tasks
 		LEFT JOIN TMTag tag ON tt.tags = tag.uuid
 		WHERE t.type = 0 AND t.trashed = 0 AND t.status = 0
-			AND t.start = 1
+			AND (t.start = 1 OR (t.start = 2 AND t.startDate IS NOT NULL AND t.startDate <= %d))
 			AND (t.project IS NULL OR p.trashed = 0)
 			AND (hp.trashed IS NULL OR hp.trashed = 0)
 		GROUP BY t.uuid
 		ORDER BY t."index"
-	`
+	`, todayPacked)
 
 	rows, err := db.conn.Query(query)
 	if err != nil {
