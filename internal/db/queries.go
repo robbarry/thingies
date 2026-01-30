@@ -541,6 +541,89 @@ func (db *ThingsDB) GetInboxTasks() ([]models.Task, error) {
 	return scanTasks(rows)
 }
 
+// GetUpcomingTasks returns tasks scheduled for the future (start=2/Someday with future startDate)
+func (db *ThingsDB) GetUpcomingTasks() ([]models.Task, error) {
+	todayPacked := TodayPackedDate()
+	query := fmt.Sprintf(`
+		SELECT
+			t.uuid,
+			t.title,
+			t.notes,
+			t.status,
+			t.type,
+			t.creationDate,
+			t.userModificationDate,
+			t.startDate,
+			t.deadline,
+			t.stopDate,
+			COALESCE(a.title, pa.title) as area_name,
+			p.title as project_name,
+			GROUP_CONCAT(tag.title, ', ') as tags,
+			CASE WHEN t.rt1_repeatingTemplate IS NOT NULL THEN 1 ELSE 0 END as is_repeating,
+			t.todayIndex
+		FROM TMTask t
+		LEFT JOIN TMArea a ON t.area = a.uuid
+		LEFT JOIN TMTask p ON t.project = p.uuid AND p.type = 1
+		LEFT JOIN TMArea pa ON p.area = pa.uuid
+		LEFT JOIN TMTaskTag tt ON t.uuid = tt.tasks
+		LEFT JOIN TMTag tag ON tt.tags = tag.uuid
+		WHERE t.type = 0 AND t.trashed = 0 AND t.status = 0
+			AND t.start = 2
+			AND t.startDate IS NOT NULL AND t.startDate > %d
+		GROUP BY t.uuid
+		ORDER BY t.startDate, t."index"
+	`, todayPacked)
+
+	rows, err := db.conn.Query(query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query upcoming tasks: %w", err)
+	}
+	defer rows.Close()
+
+	return scanTasks(rows)
+}
+
+// GetSomedayTasks returns someday tasks (start=2/Someday with no startDate)
+func (db *ThingsDB) GetSomedayTasks() ([]models.Task, error) {
+	query := `
+		SELECT
+			t.uuid,
+			t.title,
+			t.notes,
+			t.status,
+			t.type,
+			t.creationDate,
+			t.userModificationDate,
+			t.startDate,
+			t.deadline,
+			t.stopDate,
+			COALESCE(a.title, pa.title) as area_name,
+			p.title as project_name,
+			GROUP_CONCAT(tag.title, ', ') as tags,
+			CASE WHEN t.rt1_repeatingTemplate IS NOT NULL THEN 1 ELSE 0 END as is_repeating,
+			t.todayIndex
+		FROM TMTask t
+		LEFT JOIN TMArea a ON t.area = a.uuid
+		LEFT JOIN TMTask p ON t.project = p.uuid AND p.type = 1
+		LEFT JOIN TMArea pa ON p.area = pa.uuid
+		LEFT JOIN TMTaskTag tt ON t.uuid = tt.tasks
+		LEFT JOIN TMTag tag ON tt.tags = tag.uuid
+		WHERE t.type = 0 AND t.trashed = 0 AND t.status = 0
+			AND t.start = 2
+			AND t.startDate IS NULL
+		GROUP BY t.uuid
+		ORDER BY t."index"
+	`
+
+	rows, err := db.conn.Query(query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query someday tasks: %w", err)
+	}
+	defer rows.Close()
+
+	return scanTasks(rows)
+}
+
 // GetAuthToken retrieves the URL scheme authentication token
 func (db *ThingsDB) GetAuthToken() (string, error) {
 	var settings sql.NullString

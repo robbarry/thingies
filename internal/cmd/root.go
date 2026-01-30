@@ -44,6 +44,8 @@ func init() {
 	rootCmd.AddCommand(tags.TagsCmd)
 	rootCmd.AddCommand(todayCmd)
 	rootCmd.AddCommand(inboxCmd)
+	rootCmd.AddCommand(upcomingCmd)
+	rootCmd.AddCommand(somedayCmd)
 	rootCmd.AddCommand(searchCmd)
 	rootCmd.AddCommand(snapshotCmd)
 }
