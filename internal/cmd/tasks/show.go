@@ -21,7 +21,13 @@ func runShow(cmd *cobra.Command, args []string) error {
 	}
 	defer thingsDB.Close()
 
-	task, err := thingsDB.GetTask(args[0])
+	// Resolve short UUID if needed
+	fullUUID, err := thingsDB.ResolveTaskUUID(args[0])
+	if err != nil {
+		return err
+	}
+
+	task, err := thingsDB.GetTask(fullUUID)
 	if err != nil {
 		return err
 	}

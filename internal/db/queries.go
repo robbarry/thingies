@@ -706,6 +706,33 @@ func (db *ThingsDB) GetLogbook(limit int) ([]models.Task, error) {
 	return scanTasks(rows)
 }
 
+// ResolveTaskUUID resolves a short UUID prefix to a full task UUID
+func (db *ThingsDB) ResolveTaskUUID(prefix string) (string, error) {
+	query := `SELECT uuid FROM TMTask WHERE uuid LIKE ? || '%' AND type = 0`
+	rows, err := db.conn.Query(query, prefix)
+	if err != nil {
+		return "", fmt.Errorf("failed to query task: %w", err)
+	}
+	defer rows.Close()
+
+	var uuids []string
+	for rows.Next() {
+		var uuid string
+		if err := rows.Scan(&uuid); err != nil {
+			return "", err
+		}
+		uuids = append(uuids, uuid)
+	}
+
+	if len(uuids) == 0 {
+		return "", fmt.Errorf("task not found: %s", prefix)
+	}
+	if len(uuids) > 1 {
+		return "", fmt.Errorf("ambiguous task prefix '%s' matches %d tasks", prefix, len(uuids))
+	}
+	return uuids[0], nil
+}
+
 // ResolveAreaUUID resolves a short UUID prefix to a full area UUID
 func (db *ThingsDB) ResolveAreaUUID(prefix string) (string, error) {
 	query := `SELECT uuid FROM TMArea WHERE uuid LIKE ? || '%'`
