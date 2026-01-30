@@ -66,8 +66,11 @@ func (f *TableFormatter) FormatTasks(tasks []models.Task) error {
 		} else if task.AreaName.Valid && task.AreaName.String != "" {
 			context = append(context, f.style(magenta, task.AreaName.String))
 		}
+		if task.Scheduled.Valid {
+			context = append(context, f.style(green, task.Scheduled.Time.Format("2006-01-02")))
+		}
 		if task.Deadline.Valid {
-			context = append(context, f.style(red, task.Deadline.Time.Format("2006-01-02")))
+			context = append(context, f.style(red, "due ")+f.style(red, task.Deadline.Time.Format("2006-01-02")))
 		}
 		if task.Tags.Valid && task.Tags.String != "" {
 			context = append(context, f.style(yellow, task.Tags.String))
