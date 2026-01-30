@@ -217,6 +217,23 @@ end tell`, uuid)
 	return runAppleScript(script)
 }
 
+// DeleteHeading deletes a heading by UUID
+// Tasks under the heading move to project root
+func DeleteHeading(uuid string) error {
+	script := fmt.Sprintf(`tell application "Things3"
+	delete to do id "%s"
+end tell`, uuid)
+	return runAppleScript(script)
+}
+
+// RenameHeading renames a heading by UUID
+func RenameHeading(uuid, newTitle string) error {
+	script := fmt.Sprintf(`tell application "Things3"
+	set name of to do id "%s" to %q
+end tell`, uuid, newTitle)
+	return runAppleScript(script)
+}
+
 // runAppleScriptWithOutput executes AppleScript and returns the output
 func runAppleScriptWithOutput(script string) (string, error) {
 	cmd := exec.Command("osascript", "-e", script)
