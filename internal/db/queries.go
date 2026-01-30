@@ -501,7 +501,7 @@ func (db *ThingsDB) Search(term string, includeNotes, includeFuture bool) ([]mod
 	return scanTasks(rows)
 }
 
-// GetInboxTasks returns tasks in the inbox (no area, no project, not scheduled)
+// GetInboxTasks returns tasks in the inbox (start = 0, meaning unprocessed)
 func (db *ThingsDB) GetInboxTasks() ([]models.Task, error) {
 	query := `
 		SELECT
@@ -515,17 +515,19 @@ func (db *ThingsDB) GetInboxTasks() ([]models.Task, error) {
 			t.startDate,
 			t.deadline,
 			t.stopDate,
-			NULL as area_name,
-			NULL as project_name,
+			COALESCE(a.title, pa.title) as area_name,
+			p.title as project_name,
 			GROUP_CONCAT(tag.title, ', ') as tags,
 			CASE WHEN t.rt1_repeatingTemplate IS NOT NULL THEN 1 ELSE 0 END as is_repeating,
 			t.todayIndex
 		FROM TMTask t
+		LEFT JOIN TMArea a ON t.area = a.uuid
+		LEFT JOIN TMTask p ON t.project = p.uuid AND p.type = 1
+		LEFT JOIN TMArea pa ON p.area = pa.uuid
 		LEFT JOIN TMTaskTag tt ON t.uuid = tt.tasks
 		LEFT JOIN TMTag tag ON tt.tags = tag.uuid
 		WHERE t.type = 0 AND t.trashed = 0 AND t.status = 0
-			AND t.area IS NULL AND t.project IS NULL
-			AND (t.startDate IS NULL OR t.start = 0)
+			AND t.start = 0
 		GROUP BY t.uuid
 		ORDER BY t."index"
 	`
