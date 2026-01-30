@@ -58,13 +58,19 @@ func (f *TableFormatter) FormatTasks(tasks []models.Task) error {
 
 		// Build context parts
 		var context []string
-		// Show Area > Project hierarchy when both exist
-		if task.AreaName.Valid && task.AreaName.String != "" && task.ProjectName.Valid && task.ProjectName.String != "" {
-			context = append(context, f.style(magenta, task.AreaName.String)+f.style(dim, " > ")+f.style(blue, task.ProjectName.String))
-		} else if task.ProjectName.Valid && task.ProjectName.String != "" {
-			context = append(context, f.style(blue, task.ProjectName.String))
-		} else if task.AreaName.Valid && task.AreaName.String != "" {
-			context = append(context, f.style(magenta, task.AreaName.String))
+		// Show Area > Project > Heading hierarchy
+		var hierarchy []string
+		if task.AreaName.Valid && task.AreaName.String != "" {
+			hierarchy = append(hierarchy, f.style(magenta, task.AreaName.String))
+		}
+		if task.ProjectName.Valid && task.ProjectName.String != "" {
+			hierarchy = append(hierarchy, f.style(blue, task.ProjectName.String))
+		}
+		if task.HeadingName.Valid && task.HeadingName.String != "" {
+			hierarchy = append(hierarchy, f.style(cyan, task.HeadingName.String))
+		}
+		if len(hierarchy) > 0 {
+			context = append(context, strings.Join(hierarchy, f.style(dim, " > ")))
 		}
 		if task.Scheduled.Valid {
 			context = append(context, f.style(green, task.Scheduled.Time.Format("2006-01-02")))
@@ -311,13 +317,19 @@ func (f *TableFormatter) FormatSearchResults(tasks []models.Task, term string) e
 		// Build context parts
 		var context []string
 		context = append(context, f.style(yellow, typeName))
-		// Show Area > Project hierarchy when both exist
-		if task.AreaName.Valid && task.AreaName.String != "" && task.ProjectName.Valid && task.ProjectName.String != "" {
-			context = append(context, f.style(magenta, task.AreaName.String)+f.style(dim, " > ")+f.style(blue, task.ProjectName.String))
-		} else if task.ProjectName.Valid && task.ProjectName.String != "" {
-			context = append(context, f.style(blue, task.ProjectName.String))
-		} else if task.AreaName.Valid && task.AreaName.String != "" {
-			context = append(context, f.style(magenta, task.AreaName.String))
+		// Show Area > Project > Heading hierarchy
+		var hierarchy []string
+		if task.AreaName.Valid && task.AreaName.String != "" {
+			hierarchy = append(hierarchy, f.style(magenta, task.AreaName.String))
+		}
+		if task.ProjectName.Valid && task.ProjectName.String != "" {
+			hierarchy = append(hierarchy, f.style(blue, task.ProjectName.String))
+		}
+		if task.HeadingName.Valid && task.HeadingName.String != "" {
+			hierarchy = append(hierarchy, f.style(cyan, task.HeadingName.String))
+		}
+		if len(hierarchy) > 0 {
+			context = append(context, strings.Join(hierarchy, f.style(dim, " > ")))
 		}
 		context = append(context, f.style(green, status))
 

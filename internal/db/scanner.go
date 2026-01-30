@@ -30,6 +30,7 @@ func scanTasks(rows *sql.Rows) ([]models.Task, error) {
 			&completedTS,
 			&task.AreaName,
 			&task.ProjectName,
+			&task.HeadingName,
 			&task.Tags,
 			&isRepeating,
 			&task.TodayIndex,

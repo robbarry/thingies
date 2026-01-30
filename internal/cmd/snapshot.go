@@ -142,19 +142,21 @@ func runSnapshot(cmd *cobra.Command, args []string) error {
 
 func printSnapshot(output snapshotOutput, noColor bool) error {
 	var (
-		headerStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("12"))
-		areaStyle   = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("5"))
-		projStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("4"))
-		taskStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("6"))
-		idStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("8"))
-		countStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("8"))
-		dateStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("2"))
+		headerStyle  = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("12"))
+		areaStyle    = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("5"))
+		projStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("4"))
+		headingStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("3"))
+		taskStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("6"))
+		idStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color("8"))
+		countStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("8"))
+		dateStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("2"))
 	)
 
 	if noColor {
 		headerStyle = lipgloss.NewStyle()
 		areaStyle = lipgloss.NewStyle()
 		projStyle = lipgloss.NewStyle()
+		headingStyle = lipgloss.NewStyle()
 		taskStyle = lipgloss.NewStyle()
 		idStyle = lipgloss.NewStyle()
 		countStyle = lipgloss.NewStyle()
@@ -169,16 +171,18 @@ func printSnapshot(output snapshotOutput, noColor bool) error {
 	}
 
 	taskContext := func(t models.TaskJSON) string {
-		var parts []string
-		if t.AreaName != "" && t.ProjectName != "" {
-			parts = append(parts, areaStyle.Render(t.AreaName)+countStyle.Render(" > ")+projStyle.Render(t.ProjectName))
-		} else if t.ProjectName != "" {
-			parts = append(parts, projStyle.Render(t.ProjectName))
-		} else if t.AreaName != "" {
-			parts = append(parts, areaStyle.Render(t.AreaName))
+		var hierarchy []string
+		if t.AreaName != "" {
+			hierarchy = append(hierarchy, areaStyle.Render(t.AreaName))
 		}
-		if len(parts) > 0 {
-			return " " + countStyle.Render("(") + strings.Join(parts, ", ") + countStyle.Render(")")
+		if t.ProjectName != "" {
+			hierarchy = append(hierarchy, projStyle.Render(t.ProjectName))
+		}
+		if t.HeadingName != "" {
+			hierarchy = append(hierarchy, taskStyle.Render(t.HeadingName))
+		}
+		if len(hierarchy) > 0 {
+			return " " + countStyle.Render("(") + strings.Join(hierarchy, countStyle.Render(" > ")) + countStyle.Render(")")
 		}
 		return ""
 	}
@@ -240,8 +244,30 @@ func printSnapshot(output snapshotOutput, noColor bool) error {
 			taskCount := len(proj.Tasks)
 			fmt.Printf("  %s %s %s\n", idStyle.Render(shortID(proj.UUID)), projStyle.Render("▸ "+proj.Title), countStyle.Render(fmt.Sprintf("(%d)", taskCount)))
 
+			// Group tasks by heading
+			tasksByHeading := make(map[string][]models.TaskJSON)
+			var headingOrder []string
 			for _, t := range proj.Tasks {
-				fmt.Printf("    %s %s %s\n", idStyle.Render(shortID(t.UUID)), models.StatusIncomplete.Icon(), taskStyle.Render(t.Title))
+				heading := t.HeadingName
+				if _, exists := tasksByHeading[heading]; !exists {
+					headingOrder = append(headingOrder, heading)
+				}
+				tasksByHeading[heading] = append(tasksByHeading[heading], t)
+			}
+
+			// Print tasks grouped by heading
+			for _, heading := range headingOrder {
+				tasks := tasksByHeading[heading]
+				if heading != "" {
+					fmt.Printf("    %s\n", headingStyle.Render("› "+heading))
+					for _, t := range tasks {
+						fmt.Printf("      %s %s %s\n", idStyle.Render(shortID(t.UUID)), models.StatusIncomplete.Icon(), taskStyle.Render(t.Title))
+					}
+				} else {
+					for _, t := range tasks {
+						fmt.Printf("    %s %s %s\n", idStyle.Render(shortID(t.UUID)), models.StatusIncomplete.Icon(), taskStyle.Render(t.Title))
+					}
+				}
 			}
 		}
 

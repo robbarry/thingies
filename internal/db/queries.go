@@ -34,6 +34,7 @@ func (db *ThingsDB) ListTasks(filter TaskFilter) ([]models.Task, error) {
 			t.stopDate,
 			COALESCE(a.title, pa.title, hpa.title) as area_name,
 			COALESCE(p.title, hp.title) as project_name,
+			h.title as heading_name,
 			GROUP_CONCAT(tag.title, ', ') as tags,
 			CASE WHEN t.rt1_repeatingTemplate IS NOT NULL THEN 1 ELSE 0 END as is_repeating,
 			t.todayIndex
@@ -136,6 +137,7 @@ func (db *ThingsDB) GetTask(uuid string) (*models.Task, error) {
 			t.stopDate,
 			COALESCE(a.title, pa.title, hpa.title) as area_name,
 			COALESCE(p.title, hp.title) as project_name,
+			h.title as heading_name,
 			GROUP_CONCAT(tag.title, ', ') as tags,
 			CASE WHEN t.rt1_repeatingTemplate IS NOT NULL THEN 1 ELSE 0 END as is_repeating,
 			t.todayIndex
@@ -254,6 +256,7 @@ func (db *ThingsDB) GetProjectTasks(projectUUID string, includeCompleted bool) (
 			t.stopDate,
 			COALESCE(a.title, pa.title, hpa.title) as area_name,
 			COALESCE(p.title, hp.title) as project_name,
+			h.title as heading_name,
 			GROUP_CONCAT(tag.title, ', ') as tags,
 			CASE WHEN t.rt1_repeatingTemplate IS NOT NULL THEN 1 ELSE 0 END as is_repeating,
 			t.todayIndex
@@ -391,6 +394,7 @@ func (db *ThingsDB) GetAreaTasks(areaUUID string, includeCompleted bool) ([]mode
 			t.stopDate,
 			a.title as area_name,
 			NULL as project_name,
+			NULL as heading_name,
 			GROUP_CONCAT(tag.title, ', ') as tags,
 			CASE WHEN t.rt1_repeatingTemplate IS NOT NULL THEN 1 ELSE 0 END as is_repeating,
 			t.todayIndex
@@ -465,6 +469,7 @@ func (db *ThingsDB) Search(term string, includeNotes, includeFuture bool) ([]mod
 			t.stopDate,
 			COALESCE(a.title, pa.title, hpa.title) as area_name,
 			COALESCE(p.title, hp.title) as project_name,
+			h.title as heading_name,
 			GROUP_CONCAT(tag.title, ', ') as tags,
 			CASE WHEN t.rt1_repeatingTemplate IS NOT NULL THEN 1 ELSE 0 END as is_repeating,
 			t.todayIndex
@@ -525,6 +530,7 @@ func (db *ThingsDB) GetInboxTasks() ([]models.Task, error) {
 			t.stopDate,
 			COALESCE(a.title, pa.title, hpa.title) as area_name,
 			COALESCE(p.title, hp.title) as project_name,
+			h.title as heading_name,
 			GROUP_CONCAT(tag.title, ', ') as tags,
 			CASE WHEN t.rt1_repeatingTemplate IS NOT NULL THEN 1 ELSE 0 END as is_repeating,
 			t.todayIndex
@@ -569,6 +575,7 @@ func (db *ThingsDB) GetUpcomingTasks() ([]models.Task, error) {
 			t.stopDate,
 			COALESCE(a.title, pa.title, hpa.title) as area_name,
 			COALESCE(p.title, hp.title) as project_name,
+			h.title as heading_name,
 			GROUP_CONCAT(tag.title, ', ') as tags,
 			CASE WHEN t.rt1_repeatingTemplate IS NOT NULL THEN 1 ELSE 0 END as is_repeating,
 			t.todayIndex
@@ -613,6 +620,7 @@ func (db *ThingsDB) GetSomedayTasks() ([]models.Task, error) {
 			t.stopDate,
 			COALESCE(a.title, pa.title, hpa.title) as area_name,
 			COALESCE(p.title, hp.title) as project_name,
+			h.title as heading_name,
 			GROUP_CONCAT(tag.title, ', ') as tags,
 			CASE WHEN t.rt1_repeatingTemplate IS NOT NULL THEN 1 ELSE 0 END as is_repeating,
 			t.todayIndex
