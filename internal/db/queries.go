@@ -861,6 +861,36 @@ func (db *ThingsDB) ResolveTagUUID(prefix string) (string, error) {
 	return uuids[0], nil
 }
 
+// GetProjectHeadings returns headings belonging to a project
+func (db *ThingsDB) GetProjectHeadings(projectUUID string) ([]models.Heading, error) {
+	query := `
+		SELECT
+			uuid,
+			title,
+			"index"
+		FROM TMTask
+		WHERE type = 2 AND project = ? AND trashed = 0
+		ORDER BY "index"
+	`
+
+	rows, err := db.conn.Query(query, projectUUID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query project headings: %w", err)
+	}
+	defer rows.Close()
+
+	var headings []models.Heading
+	for rows.Next() {
+		var h models.Heading
+		if err := rows.Scan(&h.UUID, &h.Title, &h.Index); err != nil {
+			return nil, fmt.Errorf("failed to scan heading: %w", err)
+		}
+		headings = append(headings, h)
+	}
+
+	return headings, rows.Err()
+}
+
 // GetTag returns a single tag by UUID
 func (db *ThingsDB) GetTag(uuid string) (*models.Tag, error) {
 	query := `
