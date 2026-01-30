@@ -158,6 +158,14 @@ end tell`, uuid)
 	return runAppleScript(script)
 }
 
+// CancelProject marks a project as canceled
+func CancelProject(uuid string) error {
+	script := fmt.Sprintf(`tell application "Things3"
+	set status of project id "%s" to canceled
+end tell`, uuid)
+	return runAppleScript(script)
+}
+
 // CreateArea creates a new area and returns its UUID
 func CreateArea(name string) (string, error) {
 	script := fmt.Sprintf(`tell application "Things3"
