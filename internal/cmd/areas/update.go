@@ -1,0 +1,52 @@
+package areas
+
+import (
+	"fmt"
+
+	"github.com/spf13/cobra"
+	"thingies/internal/cmd/shared"
+	"thingies/internal/db"
+	"thingies/internal/things"
+)
+
+var (
+	updateName string
+)
+
+var updateCmd = &cobra.Command{
+	Use:   "update <uuid>",
+	Short: "Update an area",
+	Args:  cobra.ExactArgs(1),
+	RunE:  runUpdate,
+}
+
+func init() {
+	updateCmd.Flags().StringVar(&updateName, "name", "", "New name for the area")
+}
+
+func runUpdate(cmd *cobra.Command, args []string) error {
+	uuid := args[0]
+
+	if updateName == "" {
+		return fmt.Errorf("no update parameters provided; use --name")
+	}
+
+	// Resolve short UUID if needed
+	thingsDB, err := db.Open(shared.GetDBPath(cmd))
+	if err != nil {
+		return err
+	}
+	defer thingsDB.Close()
+
+	fullUUID, err := thingsDB.ResolveAreaUUID(uuid)
+	if err != nil {
+		return err
+	}
+
+	if err := things.UpdateArea(fullUUID, updateName); err != nil {
+		return err
+	}
+
+	fmt.Printf("Updated area: %s\n", fullUUID)
+	return nil
+}

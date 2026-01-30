@@ -661,3 +661,84 @@ func (db *ThingsDB) GetAuthToken() (string, error) {
 	// TODO: Parse plist to extract uriSchemeAuthenticationToken
 	return "", nil
 }
+
+// ResolveAreaUUID resolves a short UUID prefix to a full area UUID
+func (db *ThingsDB) ResolveAreaUUID(prefix string) (string, error) {
+	query := `SELECT uuid FROM TMArea WHERE uuid LIKE ? || '%'`
+	rows, err := db.conn.Query(query, prefix)
+	if err != nil {
+		return "", fmt.Errorf("failed to query area: %w", err)
+	}
+	defer rows.Close()
+
+	var uuids []string
+	for rows.Next() {
+		var uuid string
+		if err := rows.Scan(&uuid); err != nil {
+			return "", err
+		}
+		uuids = append(uuids, uuid)
+	}
+
+	if len(uuids) == 0 {
+		return "", fmt.Errorf("area not found: %s", prefix)
+	}
+	if len(uuids) > 1 {
+		return "", fmt.Errorf("ambiguous area prefix '%s' matches %d areas", prefix, len(uuids))
+	}
+	return uuids[0], nil
+}
+
+// ResolveTagUUID resolves a short UUID prefix to a full tag UUID
+func (db *ThingsDB) ResolveTagUUID(prefix string) (string, error) {
+	query := `SELECT uuid FROM TMTag WHERE uuid LIKE ? || '%'`
+	rows, err := db.conn.Query(query, prefix)
+	if err != nil {
+		return "", fmt.Errorf("failed to query tag: %w", err)
+	}
+	defer rows.Close()
+
+	var uuids []string
+	for rows.Next() {
+		var uuid string
+		if err := rows.Scan(&uuid); err != nil {
+			return "", err
+		}
+		uuids = append(uuids, uuid)
+	}
+
+	if len(uuids) == 0 {
+		return "", fmt.Errorf("tag not found: %s", prefix)
+	}
+	if len(uuids) > 1 {
+		return "", fmt.Errorf("ambiguous tag prefix '%s' matches %d tags", prefix, len(uuids))
+	}
+	return uuids[0], nil
+}
+
+// GetTag returns a single tag by UUID
+func (db *ThingsDB) GetTag(uuid string) (*models.Tag, error) {
+	query := `
+		SELECT
+			t.uuid,
+			t.title,
+			t.shortcut,
+			COUNT(DISTINCT tt.tasks) as task_count
+		FROM TMTag t
+		LEFT JOIN TMTaskTag tt ON t.uuid = tt.tags
+		LEFT JOIN TMTask task ON tt.tasks = task.uuid AND task.trashed = 0
+		WHERE t.uuid = ?
+		GROUP BY t.uuid
+	`
+
+	var tag models.Tag
+	err := db.conn.QueryRow(query, uuid).Scan(&tag.UUID, &tag.Title, &tag.Shortcut, &tag.TaskCount)
+	if err == sql.ErrNoRows {
+		return nil, fmt.Errorf("tag not found: %s", uuid)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to query tag: %w", err)
+	}
+
+	return &tag, nil
+}

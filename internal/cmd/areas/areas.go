@@ -9,10 +9,13 @@ var AreasCmd = &cobra.Command{
 	Use:     "areas",
 	Aliases: []string{"area", "a"},
 	Short:   "Manage areas",
-	Long:    `List and show areas.`,
+	Long:    `List, show, create, update, and delete areas.`,
 }
 
 func init() {
 	AreasCmd.AddCommand(listCmd)
 	AreasCmd.AddCommand(showCmd)
+	AreasCmd.AddCommand(createCmd)
+	AreasCmd.AddCommand(updateCmd)
+	AreasCmd.AddCommand(deleteCmd)
 }

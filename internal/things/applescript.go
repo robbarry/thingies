@@ -157,3 +157,72 @@ func CompleteProject(uuid string) error {
 end tell`, uuid)
 	return runAppleScript(script)
 }
+
+// CreateArea creates a new area and returns its UUID
+func CreateArea(name string) (string, error) {
+	script := fmt.Sprintf(`tell application "Things3"
+	set newArea to make new area with properties {name:%q}
+	return id of newArea
+end tell`, name)
+	return runAppleScriptWithOutput(script)
+}
+
+// UpdateArea updates an area's name
+func UpdateArea(uuid, name string) error {
+	script := fmt.Sprintf(`tell application "Things3"
+	set name of area id "%s" to %q
+end tell`, uuid, name)
+	return runAppleScript(script)
+}
+
+// DeleteArea deletes an area by UUID
+func DeleteArea(uuid string) error {
+	script := fmt.Sprintf(`tell application "Things3"
+	delete area id "%s"
+end tell`, uuid)
+	return runAppleScript(script)
+}
+
+// CreateTag creates a new tag and returns its UUID
+func CreateTag(name string, parentUUID string) (string, error) {
+	var script string
+	if parentUUID != "" {
+		script = fmt.Sprintf(`tell application "Things3"
+	set parentTag to tag id "%s"
+	set newTag to make new tag with properties {name:%q, parent tag:parentTag}
+	return id of newTag
+end tell`, parentUUID, name)
+	} else {
+		script = fmt.Sprintf(`tell application "Things3"
+	set newTag to make new tag with properties {name:%q}
+	return id of newTag
+end tell`, name)
+	}
+	return runAppleScriptWithOutput(script)
+}
+
+// UpdateTag updates a tag's name
+func UpdateTag(uuid, name string) error {
+	script := fmt.Sprintf(`tell application "Things3"
+	set name of tag id "%s" to %q
+end tell`, uuid, name)
+	return runAppleScript(script)
+}
+
+// DeleteTag deletes a tag by UUID
+func DeleteTag(uuid string) error {
+	script := fmt.Sprintf(`tell application "Things3"
+	delete tag id "%s"
+end tell`, uuid)
+	return runAppleScript(script)
+}
+
+// runAppleScriptWithOutput executes AppleScript and returns the output
+func runAppleScriptWithOutput(script string) (string, error) {
+	cmd := exec.Command("osascript", "-e", script)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("applescript error: %s: %w", strings.TrimSpace(string(output)), err)
+	}
+	return strings.TrimSpace(string(output)), nil
+}
