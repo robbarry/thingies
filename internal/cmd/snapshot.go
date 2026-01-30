@@ -168,11 +168,26 @@ func printSnapshot(output snapshotOutput, noColor bool) error {
 		return uuid
 	}
 
+	taskContext := func(t models.TaskJSON) string {
+		var parts []string
+		if t.AreaName != "" && t.ProjectName != "" {
+			parts = append(parts, areaStyle.Render(t.AreaName)+countStyle.Render(" > ")+projStyle.Render(t.ProjectName))
+		} else if t.ProjectName != "" {
+			parts = append(parts, projStyle.Render(t.ProjectName))
+		} else if t.AreaName != "" {
+			parts = append(parts, areaStyle.Render(t.AreaName))
+		}
+		if len(parts) > 0 {
+			return " " + countStyle.Render("(") + strings.Join(parts, ", ") + countStyle.Render(")")
+		}
+		return ""
+	}
+
 	// Today
 	if len(output.Today) > 0 {
 		fmt.Printf("%s %s\n", headerStyle.Render("📅 Today"), countStyle.Render(fmt.Sprintf("(%d)", len(output.Today))))
 		for _, t := range output.Today {
-			fmt.Printf("  %s %s %s\n", idStyle.Render(shortID(t.UUID)), models.StatusIncomplete.Icon(), taskStyle.Render(t.Title))
+			fmt.Printf("  %s %s %s%s\n", idStyle.Render(shortID(t.UUID)), models.StatusIncomplete.Icon(), taskStyle.Render(t.Title), taskContext(t))
 		}
 		fmt.Println()
 	}
@@ -181,7 +196,7 @@ func printSnapshot(output snapshotOutput, noColor bool) error {
 	if len(output.Inbox) > 0 {
 		fmt.Printf("%s %s\n", headerStyle.Render("📥 Inbox"), countStyle.Render(fmt.Sprintf("(%d)", len(output.Inbox))))
 		for _, t := range output.Inbox {
-			fmt.Printf("  %s %s %s\n", idStyle.Render(shortID(t.UUID)), models.StatusIncomplete.Icon(), taskStyle.Render(t.Title))
+			fmt.Printf("  %s %s %s%s\n", idStyle.Render(shortID(t.UUID)), models.StatusIncomplete.Icon(), taskStyle.Render(t.Title), taskContext(t))
 		}
 		fmt.Println()
 	}
@@ -206,7 +221,7 @@ func printSnapshot(output snapshotOutput, noColor bool) error {
 	if len(output.Someday) > 0 {
 		fmt.Printf("%s %s\n", headerStyle.Render("💭 Someday"), countStyle.Render(fmt.Sprintf("(%d)", len(output.Someday))))
 		for _, t := range output.Someday {
-			fmt.Printf("  %s %s %s\n", idStyle.Render(shortID(t.UUID)), models.StatusIncomplete.Icon(), taskStyle.Render(t.Title))
+			fmt.Printf("  %s %s %s%s\n", idStyle.Render(shortID(t.UUID)), models.StatusIncomplete.Icon(), taskStyle.Render(t.Title), taskContext(t))
 		}
 		fmt.Println()
 	}

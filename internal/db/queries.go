@@ -32,8 +32,8 @@ func (db *ThingsDB) ListTasks(filter TaskFilter) ([]models.Task, error) {
 			t.startDate,
 			t.deadline,
 			t.stopDate,
-			COALESCE(a.title, pa.title) as area_name,
-			p.title as project_name,
+			COALESCE(a.title, pa.title, hpa.title) as area_name,
+			COALESCE(p.title, hp.title) as project_name,
 			GROUP_CONCAT(tag.title, ', ') as tags,
 			CASE WHEN t.rt1_repeatingTemplate IS NOT NULL THEN 1 ELSE 0 END as is_repeating,
 			t.todayIndex
@@ -44,6 +44,7 @@ func (db *ThingsDB) ListTasks(filter TaskFilter) ([]models.Task, error) {
 		LEFT JOIN TMTask p2 ON t.project = p2.uuid AND p2.type = 1
 		LEFT JOIN TMTask h ON t.heading = h.uuid
 		LEFT JOIN TMTask hp ON h.project = hp.uuid AND hp.type = 1
+		LEFT JOIN TMArea hpa ON hp.area = hpa.uuid
 		LEFT JOIN TMTaskTag tt ON t.uuid = tt.tasks
 		LEFT JOIN TMTag tag ON tt.tags = tag.uuid
 		WHERE t.type = 0 AND t.trashed = 0
@@ -133,8 +134,8 @@ func (db *ThingsDB) GetTask(uuid string) (*models.Task, error) {
 			t.startDate,
 			t.deadline,
 			t.stopDate,
-			COALESCE(a.title, pa.title) as area_name,
-			p.title as project_name,
+			COALESCE(a.title, pa.title, hpa.title) as area_name,
+			COALESCE(p.title, hp.title) as project_name,
 			GROUP_CONCAT(tag.title, ', ') as tags,
 			CASE WHEN t.rt1_repeatingTemplate IS NOT NULL THEN 1 ELSE 0 END as is_repeating,
 			t.todayIndex
@@ -142,6 +143,9 @@ func (db *ThingsDB) GetTask(uuid string) (*models.Task, error) {
 		LEFT JOIN TMArea a ON t.area = a.uuid
 		LEFT JOIN TMTask p ON t.project = p.uuid AND p.type = 1
 		LEFT JOIN TMArea pa ON p.area = pa.uuid
+		LEFT JOIN TMTask h ON t.heading = h.uuid
+		LEFT JOIN TMTask hp ON h.project = hp.uuid AND hp.type = 1
+		LEFT JOIN TMArea hpa ON hp.area = hpa.uuid
 		LEFT JOIN TMTaskTag tt ON t.uuid = tt.tasks
 		LEFT JOIN TMTag tag ON tt.tags = tag.uuid
 		WHERE t.uuid = ?
@@ -248,8 +252,8 @@ func (db *ThingsDB) GetProjectTasks(projectUUID string, includeCompleted bool) (
 			t.startDate,
 			t.deadline,
 			t.stopDate,
-			COALESCE(a.title, pa.title) as area_name,
-			p.title as project_name,
+			COALESCE(a.title, pa.title, hpa.title) as area_name,
+			COALESCE(p.title, hp.title) as project_name,
 			GROUP_CONCAT(tag.title, ', ') as tags,
 			CASE WHEN t.rt1_repeatingTemplate IS NOT NULL THEN 1 ELSE 0 END as is_repeating,
 			t.todayIndex
@@ -257,9 +261,12 @@ func (db *ThingsDB) GetProjectTasks(projectUUID string, includeCompleted bool) (
 		LEFT JOIN TMArea a ON t.area = a.uuid
 		LEFT JOIN TMTask p ON t.project = p.uuid AND p.type = 1
 		LEFT JOIN TMArea pa ON p.area = pa.uuid
+		LEFT JOIN TMTask h ON t.heading = h.uuid
+		LEFT JOIN TMTask hp ON h.project = hp.uuid AND hp.type = 1
+		LEFT JOIN TMArea hpa ON hp.area = hpa.uuid
 		LEFT JOIN TMTaskTag tt ON t.uuid = tt.tasks
 		LEFT JOIN TMTag tag ON tt.tags = tag.uuid
-		WHERE t.project = ? AND t.type = 0 AND t.trashed = 0
+		WHERE (t.project = ? OR hp.uuid = ?) AND t.type = 0 AND t.trashed = 0
 	`
 
 	if !includeCompleted {
@@ -268,7 +275,7 @@ func (db *ThingsDB) GetProjectTasks(projectUUID string, includeCompleted bool) (
 
 	query += ` GROUP BY t.uuid ORDER BY t."index"`
 
-	rows, err := db.conn.Query(query, projectUUID)
+	rows, err := db.conn.Query(query, projectUUID, projectUUID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query project tasks: %w", err)
 	}
@@ -456,8 +463,8 @@ func (db *ThingsDB) Search(term string, includeNotes, includeFuture bool) ([]mod
 			t.startDate,
 			t.deadline,
 			t.stopDate,
-			COALESCE(a.title, pa.title) as area_name,
-			p.title as project_name,
+			COALESCE(a.title, pa.title, hpa.title) as area_name,
+			COALESCE(p.title, hp.title) as project_name,
 			GROUP_CONCAT(tag.title, ', ') as tags,
 			CASE WHEN t.rt1_repeatingTemplate IS NOT NULL THEN 1 ELSE 0 END as is_repeating,
 			t.todayIndex
@@ -468,6 +475,7 @@ func (db *ThingsDB) Search(term string, includeNotes, includeFuture bool) ([]mod
 		LEFT JOIN TMTask p2 ON t.project = p2.uuid AND p2.type = 1
 		LEFT JOIN TMTask h ON t.heading = h.uuid
 		LEFT JOIN TMTask hp ON h.project = hp.uuid AND hp.type = 1
+		LEFT JOIN TMArea hpa ON hp.area = hpa.uuid
 		LEFT JOIN TMTaskTag tt ON t.uuid = tt.tasks
 		LEFT JOIN TMTag tag ON tt.tags = tag.uuid
 		WHERE t.trashed = 0
@@ -515,8 +523,8 @@ func (db *ThingsDB) GetInboxTasks() ([]models.Task, error) {
 			t.startDate,
 			t.deadline,
 			t.stopDate,
-			COALESCE(a.title, pa.title) as area_name,
-			p.title as project_name,
+			COALESCE(a.title, pa.title, hpa.title) as area_name,
+			COALESCE(p.title, hp.title) as project_name,
 			GROUP_CONCAT(tag.title, ', ') as tags,
 			CASE WHEN t.rt1_repeatingTemplate IS NOT NULL THEN 1 ELSE 0 END as is_repeating,
 			t.todayIndex
@@ -524,6 +532,9 @@ func (db *ThingsDB) GetInboxTasks() ([]models.Task, error) {
 		LEFT JOIN TMArea a ON t.area = a.uuid
 		LEFT JOIN TMTask p ON t.project = p.uuid AND p.type = 1
 		LEFT JOIN TMArea pa ON p.area = pa.uuid
+		LEFT JOIN TMTask h ON t.heading = h.uuid
+		LEFT JOIN TMTask hp ON h.project = hp.uuid AND hp.type = 1
+		LEFT JOIN TMArea hpa ON hp.area = hpa.uuid
 		LEFT JOIN TMTaskTag tt ON t.uuid = tt.tasks
 		LEFT JOIN TMTag tag ON tt.tags = tag.uuid
 		WHERE t.type = 0 AND t.trashed = 0 AND t.status = 0
@@ -556,8 +567,8 @@ func (db *ThingsDB) GetUpcomingTasks() ([]models.Task, error) {
 			t.startDate,
 			t.deadline,
 			t.stopDate,
-			COALESCE(a.title, pa.title) as area_name,
-			p.title as project_name,
+			COALESCE(a.title, pa.title, hpa.title) as area_name,
+			COALESCE(p.title, hp.title) as project_name,
 			GROUP_CONCAT(tag.title, ', ') as tags,
 			CASE WHEN t.rt1_repeatingTemplate IS NOT NULL THEN 1 ELSE 0 END as is_repeating,
 			t.todayIndex
@@ -565,6 +576,9 @@ func (db *ThingsDB) GetUpcomingTasks() ([]models.Task, error) {
 		LEFT JOIN TMArea a ON t.area = a.uuid
 		LEFT JOIN TMTask p ON t.project = p.uuid AND p.type = 1
 		LEFT JOIN TMArea pa ON p.area = pa.uuid
+		LEFT JOIN TMTask h ON t.heading = h.uuid
+		LEFT JOIN TMTask hp ON h.project = hp.uuid AND hp.type = 1
+		LEFT JOIN TMArea hpa ON hp.area = hpa.uuid
 		LEFT JOIN TMTaskTag tt ON t.uuid = tt.tasks
 		LEFT JOIN TMTag tag ON tt.tags = tag.uuid
 		WHERE t.type = 0 AND t.trashed = 0 AND t.status = 0
@@ -597,8 +611,8 @@ func (db *ThingsDB) GetSomedayTasks() ([]models.Task, error) {
 			t.startDate,
 			t.deadline,
 			t.stopDate,
-			COALESCE(a.title, pa.title) as area_name,
-			p.title as project_name,
+			COALESCE(a.title, pa.title, hpa.title) as area_name,
+			COALESCE(p.title, hp.title) as project_name,
 			GROUP_CONCAT(tag.title, ', ') as tags,
 			CASE WHEN t.rt1_repeatingTemplate IS NOT NULL THEN 1 ELSE 0 END as is_repeating,
 			t.todayIndex
@@ -606,6 +620,9 @@ func (db *ThingsDB) GetSomedayTasks() ([]models.Task, error) {
 		LEFT JOIN TMArea a ON t.area = a.uuid
 		LEFT JOIN TMTask p ON t.project = p.uuid AND p.type = 1
 		LEFT JOIN TMArea pa ON p.area = pa.uuid
+		LEFT JOIN TMTask h ON t.heading = h.uuid
+		LEFT JOIN TMTask hp ON h.project = hp.uuid AND hp.type = 1
+		LEFT JOIN TMArea hpa ON hp.area = hpa.uuid
 		LEFT JOIN TMTaskTag tt ON t.uuid = tt.tasks
 		LEFT JOIN TMTag tag ON tt.tags = tag.uuid
 		WHERE t.type = 0 AND t.trashed = 0 AND t.status = 0
