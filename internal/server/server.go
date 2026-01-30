@@ -48,6 +48,12 @@ func New(cfg Config, thingsDB *db.ThingsDB) *Server {
 // registerRoutes sets up the HTTP routes
 func (s *Server) registerRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /health", s.handleHealth)
+
+	// Projects
+	mux.HandleFunc("GET /projects", s.handleListProjects)
+	mux.HandleFunc("GET /projects/{uuid}", s.handleGetProject)
+	mux.HandleFunc("GET /projects/{uuid}/tasks", s.handleGetProjectTasks)
+	mux.HandleFunc("GET /projects/{uuid}/headings", s.handleGetProjectHeadings)
 }
 
 // withMiddleware wraps the handler with middleware
@@ -126,6 +132,92 @@ func (s *Server) Shutdown(ctx context.Context) error {
 // DB returns the database connection
 func (s *Server) DB() *db.ThingsDB {
 	return s.db
+}
+
+// handleListProjects returns all projects
+func (s *Server) handleListProjects(w http.ResponseWriter, r *http.Request) {
+	includeCompleted := r.URL.Query().Get("include-completed") == "true"
+
+	projects, err := s.db.ListProjects(includeCompleted)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Convert to JSON-serializable form
+	result := make([]interface{}, len(projects))
+	for i, p := range projects {
+		result[i] = p.ToJSON()
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(result)
+}
+
+// handleGetProject returns a single project
+func (s *Server) handleGetProject(w http.ResponseWriter, r *http.Request) {
+	uuid := r.PathValue("uuid")
+	if uuid == "" {
+		http.Error(w, "uuid required", http.StatusBadRequest)
+		return
+	}
+
+	project, err := s.db.GetProject(uuid)
+	if err != nil {
+		if err.Error() == fmt.Sprintf("project not found: %s", uuid) {
+			http.Error(w, err.Error(), http.StatusNotFound)
+			return
+		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(project.ToJSON())
+}
+
+// handleGetProjectTasks returns tasks in a project
+func (s *Server) handleGetProjectTasks(w http.ResponseWriter, r *http.Request) {
+	uuid := r.PathValue("uuid")
+	if uuid == "" {
+		http.Error(w, "uuid required", http.StatusBadRequest)
+		return
+	}
+
+	includeCompleted := r.URL.Query().Get("include-completed") == "true"
+
+	tasks, err := s.db.GetProjectTasks(uuid, includeCompleted)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Convert to JSON-serializable form
+	result := make([]interface{}, len(tasks))
+	for i, t := range tasks {
+		result[i] = t.ToJSON()
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(result)
+}
+
+// handleGetProjectHeadings returns headings in a project
+func (s *Server) handleGetProjectHeadings(w http.ResponseWriter, r *http.Request) {
+	uuid := r.PathValue("uuid")
+	if uuid == "" {
+		http.Error(w, "uuid required", http.StatusBadRequest)
+		return
+	}
+
+	headings, err := s.db.GetProjectHeadings(uuid)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(headings)
 }
 
 // Addr returns the server address
