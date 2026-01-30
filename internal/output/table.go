@@ -72,9 +72,6 @@ func (f *TableFormatter) FormatTasks(tasks []models.Task) error {
 		if len(hierarchy) > 0 {
 			context = append(context, strings.Join(hierarchy, f.style(dim, " > ")))
 		}
-		if task.Scheduled.Valid {
-			context = append(context, f.style(green, task.Scheduled.Time.Format("2006-01-02")))
-		}
 		if task.Deadline.Valid {
 			context = append(context, f.style(red, "due ")+f.style(red, task.Deadline.Time.Format("2006-01-02")))
 		}
