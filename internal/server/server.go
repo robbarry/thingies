@@ -48,6 +48,11 @@ func New(cfg Config, thingsDB *db.ThingsDB) *Server {
 // registerRoutes sets up the HTTP routes
 func (s *Server) registerRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /health", s.handleHealth)
+
+	// Task routes
+	mux.HandleFunc("GET /tasks", s.handleListTasks)
+	mux.HandleFunc("GET /tasks/search", s.handleSearchTasks)
+	mux.HandleFunc("GET /tasks/{uuid}", s.handleGetTask)
 }
 
 // withMiddleware wraps the handler with middleware
