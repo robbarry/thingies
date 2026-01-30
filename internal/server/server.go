@@ -50,7 +50,10 @@ func New(cfg Config, thingsDB *db.ThingsDB) *Server {
 // registerRoutes sets up the HTTP routes
 func (s *Server) registerRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /health", s.handleHealth)
-	mux.HandleFunc("GET /snapshot", s.handleSnapshot)
+
+	// Heading routes
+	mux.HandleFunc("DELETE /headings/{uuid}", s.handleDeleteHeading)
+	mux.HandleFunc("PATCH /headings/{uuid}", s.handleUpdateHeading)
 }
 
 // withMiddleware wraps the handler with middleware
@@ -79,7 +82,7 @@ func (s *Server) loggingMiddleware(next http.Handler) http.Handler {
 func (s *Server) corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 
 		if r.Method == http.MethodOptions {
