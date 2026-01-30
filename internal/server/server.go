@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"net/url"
 	"strings"
 	"time"
 
 	"thingies/internal/db"
+	"thingies/internal/things"
 )
 
 // Config holds server configuration
@@ -51,14 +51,12 @@ func New(cfg Config, thingsDB *db.ThingsDB) *Server {
 func (s *Server) registerRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /health", s.handleHealth)
 
-	// Task write endpoints
-	mux.HandleFunc("POST /tasks", s.handleCreateTask)
-	mux.HandleFunc("PATCH /tasks/{uuid}", s.handleUpdateTask)
-	mux.HandleFunc("DELETE /tasks/{uuid}", s.handleDeleteTask)
-	mux.HandleFunc("POST /tasks/{uuid}/complete", s.handleCompleteTask)
-	mux.HandleFunc("POST /tasks/{uuid}/cancel", s.handleCancelTask)
-	mux.HandleFunc("POST /tasks/{uuid}/move-to-today", s.handleMoveTaskToToday)
-	mux.HandleFunc("POST /tasks/{uuid}/move-to-someday", s.handleMoveTaskToSomeday)
+	// Project write endpoints
+	mux.HandleFunc("POST /projects", s.handleCreateProject)
+	mux.HandleFunc("PATCH /projects/{uuid}", s.handleUpdateProject)
+	mux.HandleFunc("POST /projects/{uuid}/complete", s.handleCompleteProject)
+	mux.HandleFunc("POST /projects/{uuid}/cancel", s.handleCancelProject)
+	mux.HandleFunc("DELETE /projects/{uuid}", s.handleDeleteProject)
 }
 
 // withMiddleware wraps the handler with middleware
@@ -230,146 +228,202 @@ func (s *Server) Addr() string {
 	return s.httpServer.Addr
 }
 
-// handleListAreas returns all visible areas
-func (s *Server) handleListAreas(w http.ResponseWriter, r *http.Request) {
-	areas, err := s.db.ListAreas()
-	if err != nil {
-		s.jsonError(w, err.Error(), http.StatusInternalServerError)
+// createProjectRequest represents the request body for creating a project
+type createProjectRequest struct {
+	Title    string   `json:"title"`
+	Notes    string   `json:"notes,omitempty"`
+	When     string   `json:"when,omitempty"`
+	Deadline string   `json:"deadline,omitempty"`
+	Tags     string   `json:"tags,omitempty"`
+	Area     string   `json:"area,omitempty"`
+	Todos    []string `json:"todos,omitempty"`
+	Headings []struct {
+		Title string   `json:"title"`
+		Todos []string `json:"todos,omitempty"`
+	} `json:"headings,omitempty"`
+}
+
+// updateProjectRequest represents the request body for updating a project
+type updateProjectRequest struct {
+	Title    string `json:"title,omitempty"`
+	Notes    string `json:"notes,omitempty"`
+	Deadline string `json:"deadline,omitempty"`
+	Tags     string `json:"tags,omitempty"`
+}
+
+// handleCreateProject creates a new project via Things URL scheme
+func (s *Server) handleCreateProject(w http.ResponseWriter, r *http.Request) {
+	var req createProjectRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		s.jsonError(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
 
-	s.jsonResponse(w, areas)
+	if req.Title == "" {
+		s.jsonError(w, "title is required", http.StatusBadRequest)
+		return
+	}
+
+	// Build todos list including headings
+	var allTodos []string
+	allTodos = append(allTodos, req.Todos...)
+
+	// Headings in Things URL scheme are prefixed with "# "
+	for _, heading := range req.Headings {
+		allTodos = append(allTodos, "# "+heading.Title)
+		allTodos = append(allTodos, heading.Todos...)
+	}
+
+	params := things.AddProjectParams{
+		Title:    req.Title,
+		Notes:    req.Notes,
+		When:     req.When,
+		Deadline: req.Deadline,
+		Tags:     req.Tags,
+		Area:     req.Area,
+		ToDos:    allTodos,
+	}
+
+	url := things.BuildAddProjectURL(params)
+	if err := things.OpenURL(url); err != nil {
+		s.jsonError(w, "failed to create project: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	s.jsonResponse(w, map[string]string{
+		"status":  "ok",
+		"message": "project creation triggered",
+	}, http.StatusAccepted)
 }
 
-// handleGetArea returns a single area by UUID
-func (s *Server) handleGetArea(w http.ResponseWriter, r *http.Request) {
+// handleUpdateProject updates a project via AppleScript
+func (s *Server) handleUpdateProject(w http.ResponseWriter, r *http.Request) {
 	uuid := r.PathValue("uuid")
 	if uuid == "" {
 		s.jsonError(w, "uuid is required", http.StatusBadRequest)
 		return
 	}
 
-	area, err := s.db.GetArea(uuid)
-	if err != nil {
-		if strings.Contains(err.Error(), "not found") {
-			s.jsonError(w, err.Error(), http.StatusNotFound)
-			return
-		}
-		s.jsonError(w, err.Error(), http.StatusInternalServerError)
+	var req updateProjectRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		s.jsonError(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
 
-	s.jsonResponse(w, area)
+	// Check if at least one field is provided
+	if req.Title == "" && req.Notes == "" && req.Deadline == "" && req.Tags == "" {
+		s.jsonError(w, "at least one field (title, notes, deadline, tags) is required", http.StatusBadRequest)
+		return
+	}
+
+	params := things.ProjectUpdateParams{
+		UUID:     uuid,
+		Name:     req.Title,
+		Notes:    req.Notes,
+		DueDate:  req.Deadline,
+		TagNames: req.Tags,
+	}
+
+	if err := things.UpdateProject(params); err != nil {
+		errStr := err.Error()
+		if strings.Contains(errStr, "Can't get project") {
+			s.jsonError(w, "project not found", http.StatusNotFound)
+			return
+		}
+		s.jsonError(w, "failed to update project: "+errStr, http.StatusInternalServerError)
+		return
+	}
+
+	s.jsonResponse(w, map[string]string{
+		"status":  "ok",
+		"message": "project updated",
+		"uuid":    uuid,
+	}, http.StatusOK)
 }
 
-// handleGetAreaTasks returns loose tasks in an area (not in projects)
-func (s *Server) handleGetAreaTasks(w http.ResponseWriter, r *http.Request) {
+// handleCompleteProject marks a project as complete
+func (s *Server) handleCompleteProject(w http.ResponseWriter, r *http.Request) {
 	uuid := r.PathValue("uuid")
 	if uuid == "" {
 		s.jsonError(w, "uuid is required", http.StatusBadRequest)
 		return
 	}
 
-	// Check if area exists first
-	_, err := s.db.GetArea(uuid)
-	if err != nil {
-		if strings.Contains(err.Error(), "not found") {
-			s.jsonError(w, err.Error(), http.StatusNotFound)
+	if err := things.CompleteProject(uuid); err != nil {
+		errStr := err.Error()
+		if strings.Contains(errStr, "Can't get project") {
+			s.jsonError(w, "project not found", http.StatusNotFound)
 			return
 		}
-		s.jsonError(w, err.Error(), http.StatusInternalServerError)
+		s.jsonError(w, "failed to complete project: "+errStr, http.StatusInternalServerError)
 		return
 	}
 
-	includeCompleted := r.URL.Query().Get("include_completed") == "true"
-	tasks, err := s.db.GetAreaTasks(uuid, includeCompleted)
-	if err != nil {
-		s.jsonError(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	s.jsonResponse(w, tasks)
+	s.jsonResponse(w, map[string]string{
+		"status":  "ok",
+		"message": "project marked complete",
+		"uuid":    uuid,
+	}, http.StatusOK)
 }
 
-// handleGetAreaProjects returns projects in an area
-func (s *Server) handleGetAreaProjects(w http.ResponseWriter, r *http.Request) {
+// handleCancelProject marks a project as canceled
+func (s *Server) handleCancelProject(w http.ResponseWriter, r *http.Request) {
 	uuid := r.PathValue("uuid")
 	if uuid == "" {
 		s.jsonError(w, "uuid is required", http.StatusBadRequest)
 		return
 	}
 
-	// Check if area exists first
-	_, err := s.db.GetArea(uuid)
-	if err != nil {
-		if strings.Contains(err.Error(), "not found") {
-			s.jsonError(w, err.Error(), http.StatusNotFound)
+	if err := things.CancelProject(uuid); err != nil {
+		errStr := err.Error()
+		if strings.Contains(errStr, "Can't get project") {
+			s.jsonError(w, "project not found", http.StatusNotFound)
 			return
 		}
-		s.jsonError(w, err.Error(), http.StatusInternalServerError)
+		s.jsonError(w, "failed to cancel project: "+errStr, http.StatusInternalServerError)
 		return
 	}
 
-	includeCompleted := r.URL.Query().Get("include_completed") == "true"
-	projects, err := s.db.GetAreaProjects(uuid, includeCompleted)
-	if err != nil {
-		s.jsonError(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	s.jsonResponse(w, projects)
+	s.jsonResponse(w, map[string]string{
+		"status":  "ok",
+		"message": "project marked canceled",
+		"uuid":    uuid,
+	}, http.StatusOK)
 }
 
-// handleListTags returns all tags with usage counts
-func (s *Server) handleListTags(w http.ResponseWriter, r *http.Request) {
-	tags, err := s.db.ListTags()
-	if err != nil {
-		s.jsonError(w, err.Error(), http.StatusInternalServerError)
+// handleDeleteProject deletes a project (moves to trash)
+func (s *Server) handleDeleteProject(w http.ResponseWriter, r *http.Request) {
+	uuid := r.PathValue("uuid")
+	if uuid == "" {
+		s.jsonError(w, "uuid is required", http.StatusBadRequest)
 		return
 	}
 
-	// Convert to JSON-serializable form
-	result := make([]interface{}, len(tags))
-	for i, tag := range tags {
-		result[i] = tag.ToJSON()
+	if err := things.DeleteProject(uuid); err != nil {
+		errStr := err.Error()
+		if strings.Contains(errStr, "Can't get project") {
+			s.jsonError(w, "project not found", http.StatusNotFound)
+			return
+		}
+		s.jsonError(w, "failed to delete project: "+errStr, http.StatusInternalServerError)
+		return
 	}
 
-	s.jsonResponse(w, result)
+	s.jsonResponse(w, map[string]string{
+		"status":  "ok",
+		"message": "project moved to trash",
+		"uuid":    uuid,
+	}, http.StatusOK)
 }
 
-// handleGetTagTasks returns tasks with a specific tag
-func (s *Server) handleGetTagTasks(w http.ResponseWriter, r *http.Request) {
-	name := r.PathValue("name")
-	if name == "" {
-		s.jsonError(w, "tag name is required", http.StatusBadRequest)
-		return
-	}
-
-	// URL-decode the tag name to handle spaces and special characters
-	decodedName, err := url.PathUnescape(name)
-	if err != nil {
-		s.jsonError(w, "invalid tag name encoding", http.StatusBadRequest)
-		return
-	}
-
-	tasks, err := s.db.GetTasksByTag(decodedName)
-	if err != nil {
-		s.jsonError(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	s.jsonResponse(w, tasks)
-}
-
-// jsonResponse writes a JSON response
-func (s *Server) jsonResponse(w http.ResponseWriter, data interface{}) {
+// jsonResponse writes a JSON response with the given status code
+func (s *Server) jsonResponse(w http.ResponseWriter, data interface{}, status int) {
 	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
 	json.NewEncoder(w).Encode(data)
 }
 
 // jsonError writes a JSON error response
-func (s *Server) jsonError(w http.ResponseWriter, message string, code int) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(code)
-	json.NewEncoder(w).Encode(map[string]string{"error": message})
+func (s *Server) jsonError(w http.ResponseWriter, message string, status int) {
+	s.jsonResponse(w, map[string]string{"error": message}, status)
 }
