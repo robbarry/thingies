@@ -51,9 +51,41 @@ func New(cfg Config, thingsDB *db.ThingsDB) *Server {
 func (s *Server) registerRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /health", s.handleHealth)
 
+	// Task read routes
+	mux.HandleFunc("GET /tasks", s.handleListTasks)
+	mux.HandleFunc("GET /tasks/search", s.handleSearchTasks)
+	mux.HandleFunc("GET /tasks/{uuid}", s.handleGetTask)
+
+	// Task write routes
+	mux.HandleFunc("POST /tasks", s.handleCreateTask)
+	mux.HandleFunc("PATCH /tasks/{uuid}", s.handleUpdateTask)
+	mux.HandleFunc("POST /tasks/{uuid}/complete", s.handleCompleteTask)
+	mux.HandleFunc("POST /tasks/{uuid}/cancel", s.handleCancelTask)
+	mux.HandleFunc("DELETE /tasks/{uuid}", s.handleDeleteTask)
+	mux.HandleFunc("POST /tasks/{uuid}/move-to-today", s.handleMoveTaskToToday)
+	mux.HandleFunc("POST /tasks/{uuid}/move-to-someday", s.handleMoveTaskToSomeday)
+
+	// View routes
+	mux.HandleFunc("GET /today", s.handleToday)
+	mux.HandleFunc("GET /inbox", s.handleInbox)
+	mux.HandleFunc("GET /anytime", s.handleAnytime)
+	mux.HandleFunc("GET /upcoming", s.handleUpcoming)
+	mux.HandleFunc("GET /someday", s.handleSomeday)
+	mux.HandleFunc("GET /logbook", s.handleLogbook)
+	mux.HandleFunc("GET /deadlines", s.handleDeadlines)
+
+	// Project routes
+	mux.HandleFunc("GET /projects", s.handleListProjects)
+	mux.HandleFunc("GET /projects/{uuid}", s.handleGetProject)
+	mux.HandleFunc("GET /projects/{uuid}/tasks", s.handleGetProjectTasks)
+	mux.HandleFunc("GET /projects/{uuid}/headings", s.handleGetProjectHeadings)
+
 	// Heading routes
 	mux.HandleFunc("DELETE /headings/{uuid}", s.handleDeleteHeading)
 	mux.HandleFunc("PATCH /headings/{uuid}", s.handleUpdateHeading)
+
+	// Snapshot route
+	mux.HandleFunc("GET /snapshot", s.handleSnapshot)
 }
 
 // withMiddleware wraps the handler with middleware
