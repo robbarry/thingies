@@ -94,6 +94,11 @@ func (db *ThingsDB) Path() string {
 // TodayPackedDate returns today's date in Things packed format
 // Things packs dates as: year << 16 | month << 12 | day << 7
 func TodayPackedDate() int {
-	now := time.Now()
-	return (now.Year() << 16) | (int(now.Month()) << 12) | (now.Day() << 7)
+	return DateToPackedInt(time.Now())
+}
+
+// DateToPackedInt converts a time.Time to Things packed date format
+// Things packs dates as: year << 16 | month << 12 | day << 7
+func DateToPackedInt(t time.Time) int {
+	return (t.Year() << 16) | (int(t.Month()) << 12) | (t.Day() << 7)
 }
