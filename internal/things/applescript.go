@@ -226,3 +226,43 @@ func runAppleScriptWithOutput(script string) (string, error) {
 	}
 	return strings.TrimSpace(string(output)), nil
 }
+
+// MoveTaskToArea moves a task to an area by UUID
+func MoveTaskToArea(taskUUID, areaUUID string) error {
+	script := fmt.Sprintf(`tell application "Things3"
+	set aToDo to to do id "%s"
+	set area of aToDo to area id "%s"
+end tell`, taskUUID, areaUUID)
+	return runAppleScript(script)
+}
+
+// MoveTaskToProject moves a task to a project by UUID
+func MoveTaskToProject(taskUUID, projectUUID string) error {
+	script := fmt.Sprintf(`tell application "Things3"
+	set aToDo to to do id "%s"
+	set project of aToDo to project id "%s"
+end tell`, taskUUID, projectUUID)
+	return runAppleScript(script)
+}
+
+// DeleteAllOpenTasks deletes all open tasks (moves to trash) and returns the count
+func DeleteAllOpenTasks() (int, error) {
+	script := `tell application "Things3"
+	set openTodos to every to do whose status is open
+	set countDeleted to count of openTodos
+	repeat with t in openTodos
+		delete t
+	end repeat
+	return countDeleted
+end tell`
+	result, err := runAppleScriptWithOutput(script)
+	if err != nil {
+		return 0, err
+	}
+	var count int
+	_, err = fmt.Sscanf(result, "%d", &count)
+	if err != nil {
+		return 0, nil
+	}
+	return count, nil
+}
