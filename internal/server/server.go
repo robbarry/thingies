@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"thingies/internal/db"
-	"thingies/internal/things"
+	"thingies/internal/models"
 )
 
 // Config holds server configuration
@@ -50,13 +50,7 @@ func New(cfg Config, thingsDB *db.ThingsDB) *Server {
 // registerRoutes sets up the HTTP routes
 func (s *Server) registerRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /health", s.handleHealth)
-
-	// Project write endpoints
-	mux.HandleFunc("POST /projects", s.handleCreateProject)
-	mux.HandleFunc("PATCH /projects/{uuid}", s.handleUpdateProject)
-	mux.HandleFunc("POST /projects/{uuid}/complete", s.handleCompleteProject)
-	mux.HandleFunc("POST /projects/{uuid}/cancel", s.handleCancelProject)
-	mux.HandleFunc("DELETE /projects/{uuid}", s.handleDeleteProject)
+	mux.HandleFunc("GET /snapshot", s.handleSnapshot)
 }
 
 // withMiddleware wraps the handler with middleware
@@ -228,202 +222,259 @@ func (s *Server) Addr() string {
 	return s.httpServer.Addr
 }
 
-// createProjectRequest represents the request body for creating a project
-type createProjectRequest struct {
-	Title    string   `json:"title"`
-	Notes    string   `json:"notes,omitempty"`
-	When     string   `json:"when,omitempty"`
-	Deadline string   `json:"deadline,omitempty"`
-	Tags     string   `json:"tags,omitempty"`
-	Area     string   `json:"area,omitempty"`
-	Todos    []string `json:"todos,omitempty"`
-	Headings []struct {
-		Title string   `json:"title"`
-		Todos []string `json:"todos,omitempty"`
-	} `json:"headings,omitempty"`
-}
-
-// updateProjectRequest represents the request body for updating a project
-type updateProjectRequest struct {
-	Title    string `json:"title,omitempty"`
-	Notes    string `json:"notes,omitempty"`
-	Deadline string `json:"deadline,omitempty"`
-	Tags     string `json:"tags,omitempty"`
-}
-
-// handleCreateProject creates a new project via Things URL scheme
-func (s *Server) handleCreateProject(w http.ResponseWriter, r *http.Request) {
-	var req createProjectRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		s.jsonError(w, "invalid request body", http.StatusBadRequest)
-		return
-	}
-
-	if req.Title == "" {
-		s.jsonError(w, "title is required", http.StatusBadRequest)
-		return
-	}
-
-	// Build todos list including headings
-	var allTodos []string
-	allTodos = append(allTodos, req.Todos...)
-
-	// Headings in Things URL scheme are prefixed with "# "
-	for _, heading := range req.Headings {
-		allTodos = append(allTodos, "# "+heading.Title)
-		allTodos = append(allTodos, heading.Todos...)
-	}
-
-	params := things.AddProjectParams{
-		Title:    req.Title,
-		Notes:    req.Notes,
-		When:     req.When,
-		Deadline: req.Deadline,
-		Tags:     req.Tags,
-		Area:     req.Area,
-		ToDos:    allTodos,
-	}
-
-	url := things.BuildAddProjectURL(params)
-	if err := things.OpenURL(url); err != nil {
-		s.jsonError(w, "failed to create project: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	s.jsonResponse(w, map[string]string{
-		"status":  "ok",
-		"message": "project creation triggered",
-	}, http.StatusAccepted)
-}
-
-// handleUpdateProject updates a project via AppleScript
-func (s *Server) handleUpdateProject(w http.ResponseWriter, r *http.Request) {
-	uuid := r.PathValue("uuid")
-	if uuid == "" {
-		s.jsonError(w, "uuid is required", http.StatusBadRequest)
-		return
-	}
-
-	var req updateProjectRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		s.jsonError(w, "invalid request body", http.StatusBadRequest)
-		return
-	}
-
-	// Check if at least one field is provided
-	if req.Title == "" && req.Notes == "" && req.Deadline == "" && req.Tags == "" {
-		s.jsonError(w, "at least one field (title, notes, deadline, tags) is required", http.StatusBadRequest)
-		return
-	}
-
-	params := things.ProjectUpdateParams{
-		UUID:     uuid,
-		Name:     req.Title,
-		Notes:    req.Notes,
-		DueDate:  req.Deadline,
-		TagNames: req.Tags,
-	}
-
-	if err := things.UpdateProject(params); err != nil {
-		errStr := err.Error()
-		if strings.Contains(errStr, "Can't get project") {
-			s.jsonError(w, "project not found", http.StatusNotFound)
-			return
-		}
-		s.jsonError(w, "failed to update project: "+errStr, http.StatusInternalServerError)
-		return
-	}
-
-	s.jsonResponse(w, map[string]string{
-		"status":  "ok",
-		"message": "project updated",
-		"uuid":    uuid,
-	}, http.StatusOK)
-}
-
-// handleCompleteProject marks a project as complete
-func (s *Server) handleCompleteProject(w http.ResponseWriter, r *http.Request) {
-	uuid := r.PathValue("uuid")
-	if uuid == "" {
-		s.jsonError(w, "uuid is required", http.StatusBadRequest)
-		return
-	}
-
-	if err := things.CompleteProject(uuid); err != nil {
-		errStr := err.Error()
-		if strings.Contains(errStr, "Can't get project") {
-			s.jsonError(w, "project not found", http.StatusNotFound)
-			return
-		}
-		s.jsonError(w, "failed to complete project: "+errStr, http.StatusInternalServerError)
-		return
-	}
-
-	s.jsonResponse(w, map[string]string{
-		"status":  "ok",
-		"message": "project marked complete",
-		"uuid":    uuid,
-	}, http.StatusOK)
-}
-
-// handleCancelProject marks a project as canceled
-func (s *Server) handleCancelProject(w http.ResponseWriter, r *http.Request) {
-	uuid := r.PathValue("uuid")
-	if uuid == "" {
-		s.jsonError(w, "uuid is required", http.StatusBadRequest)
-		return
-	}
-
-	if err := things.CancelProject(uuid); err != nil {
-		errStr := err.Error()
-		if strings.Contains(errStr, "Can't get project") {
-			s.jsonError(w, "project not found", http.StatusNotFound)
-			return
-		}
-		s.jsonError(w, "failed to cancel project: "+errStr, http.StatusInternalServerError)
-		return
-	}
-
-	s.jsonResponse(w, map[string]string{
-		"status":  "ok",
-		"message": "project marked canceled",
-		"uuid":    uuid,
-	}, http.StatusOK)
-}
-
-// handleDeleteProject deletes a project (moves to trash)
-func (s *Server) handleDeleteProject(w http.ResponseWriter, r *http.Request) {
-	uuid := r.PathValue("uuid")
-	if uuid == "" {
-		s.jsonError(w, "uuid is required", http.StatusBadRequest)
-		return
-	}
-
-	if err := things.DeleteProject(uuid); err != nil {
-		errStr := err.Error()
-		if strings.Contains(errStr, "Can't get project") {
-			s.jsonError(w, "project not found", http.StatusNotFound)
-			return
-		}
-		s.jsonError(w, "failed to delete project: "+errStr, http.StatusInternalServerError)
-		return
-	}
-
-	s.jsonResponse(w, map[string]string{
-		"status":  "ok",
-		"message": "project moved to trash",
-		"uuid":    uuid,
-	}, http.StatusOK)
-}
-
-// jsonResponse writes a JSON response with the given status code
-func (s *Server) jsonResponse(w http.ResponseWriter, data interface{}, status int) {
+// handleSnapshot returns a hierarchical text snapshot of all Things data
+func (s *Server) handleSnapshot(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(data)
+
+	snapshot, err := s.buildSnapshot()
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		return
+	}
+
+	json.NewEncoder(w).Encode(map[string]string{"snapshot": snapshot})
 }
 
-// jsonError writes a JSON error response
-func (s *Server) jsonError(w http.ResponseWriter, message string, status int) {
-	s.jsonResponse(w, map[string]string{"error": message}, status)
+// snapshotArea holds area data with projects and tasks for snapshot building
+type snapshotArea struct {
+	models.Area
+	Projects []snapshotProject
+	Tasks    []models.TaskJSON
+}
+
+// snapshotProject holds project data with tasks for snapshot building
+type snapshotProject struct {
+	models.ProjectJSON
+	Tasks []models.TaskJSON
+}
+
+// buildSnapshot creates a hierarchical text representation of all Things data
+func (s *Server) buildSnapshot() (string, error) {
+	var sb strings.Builder
+
+	// Track tasks we've already output to avoid duplicates
+	seenTasks := make(map[string]bool)
+
+	// Get today tasks
+	todayTasks, err := s.db.ListTasks(db.TaskFilter{Status: "incomplete", Today: true})
+	if err != nil {
+		return "", err
+	}
+
+	// Get inbox tasks
+	inboxTasks, err := s.db.GetInboxTasks()
+	if err != nil {
+		return "", err
+	}
+
+	// Get upcoming tasks
+	upcomingTasks, err := s.db.GetUpcomingTasks()
+	if err != nil {
+		return "", err
+	}
+
+	// Get someday tasks
+	somedayTasks, err := s.db.GetSomedayTasks()
+	if err != nil {
+		return "", err
+	}
+
+	// Get areas with projects and tasks
+	areas, err := s.db.ListAreas()
+	if err != nil {
+		return "", err
+	}
+
+	var snapshotAreas []snapshotArea
+	for _, area := range areas {
+		sa := snapshotArea{Area: area}
+
+		projects, err := s.db.GetAreaProjects(area.UUID, false)
+		if err != nil {
+			return "", err
+		}
+
+		for _, proj := range projects {
+			sp := snapshotProject{ProjectJSON: proj.ToJSON()}
+
+			tasks, err := s.db.GetProjectTasks(proj.UUID, false)
+			if err != nil {
+				return "", err
+			}
+
+			for _, t := range tasks {
+				sp.Tasks = append(sp.Tasks, t.ToJSON())
+			}
+			sa.Projects = append(sa.Projects, sp)
+		}
+
+		// Get tasks directly under area
+		areaTasks, err := s.db.GetAreaTasks(area.UUID, false)
+		if err != nil {
+			return "", err
+		}
+		for _, t := range areaTasks {
+			sa.Tasks = append(sa.Tasks, t.ToJSON())
+		}
+
+		snapshotAreas = append(snapshotAreas, sa)
+	}
+
+	// Build text output
+
+	// TODAY section
+	if len(todayTasks) > 0 {
+		sb.WriteString("# TODAY\n")
+		for _, t := range todayTasks {
+			seenTasks[t.UUID] = true
+			writeTaskLine(&sb, t.ToJSON(), 0)
+		}
+		sb.WriteString("\n")
+	}
+
+	// ANYTIME section - tasks organized by area/project/heading (not in today/upcoming/someday/inbox)
+	anytimeOutput := buildAnytimeSection(snapshotAreas, seenTasks)
+	if anytimeOutput != "" {
+		sb.WriteString("# ANYTIME\n")
+		sb.WriteString(anytimeOutput)
+		sb.WriteString("\n")
+	}
+
+	// UPCOMING section
+	if len(upcomingTasks) > 0 {
+		sb.WriteString("# UPCOMING\n")
+		for _, t := range upcomingTasks {
+			if !seenTasks[t.UUID] {
+				seenTasks[t.UUID] = true
+				writeTaskLine(&sb, t.ToJSON(), 0)
+			}
+		}
+		sb.WriteString("\n")
+	}
+
+	// SOMEDAY section
+	if len(somedayTasks) > 0 {
+		sb.WriteString("# SOMEDAY\n")
+		for _, t := range somedayTasks {
+			if !seenTasks[t.UUID] {
+				seenTasks[t.UUID] = true
+				writeTaskLine(&sb, t.ToJSON(), 0)
+			}
+		}
+		sb.WriteString("\n")
+	}
+
+	// INBOX section
+	if len(inboxTasks) > 0 {
+		sb.WriteString("# INBOX\n")
+		for _, t := range inboxTasks {
+			if !seenTasks[t.UUID] {
+				seenTasks[t.UUID] = true
+				writeTaskLine(&sb, t.ToJSON(), 0)
+			}
+		}
+		sb.WriteString("\n")
+	}
+
+	return strings.TrimSpace(sb.String()), nil
+}
+
+// buildAnytimeSection builds the ANYTIME section with area/project/heading hierarchy
+func buildAnytimeSection(areas []snapshotArea, seenTasks map[string]bool) string {
+	var sb strings.Builder
+
+	for _, area := range areas {
+		areaHasOutput := false
+		var areaSb strings.Builder
+
+		for _, proj := range area.Projects {
+			projHasOutput := false
+			var projSb strings.Builder
+
+			// Group tasks by heading
+			tasksByHeading := make(map[string][]models.TaskJSON)
+			var headingOrder []string
+			for _, t := range proj.Tasks {
+				if seenTasks[t.UUID] {
+					continue
+				}
+				heading := t.HeadingName
+				if _, exists := tasksByHeading[heading]; !exists {
+					headingOrder = append(headingOrder, heading)
+				}
+				tasksByHeading[heading] = append(tasksByHeading[heading], t)
+			}
+
+			// Output tasks by heading
+			for _, heading := range headingOrder {
+				tasks := tasksByHeading[heading]
+				if len(tasks) == 0 {
+					continue
+				}
+
+				if heading != "" {
+					projSb.WriteString(fmt.Sprintf("      %s:\n", heading))
+					for _, t := range tasks {
+						seenTasks[t.UUID] = true
+						writeTaskLine(&projSb, t, 4)
+						projHasOutput = true
+					}
+				} else {
+					for _, t := range tasks {
+						seenTasks[t.UUID] = true
+						writeTaskLine(&projSb, t, 2)
+						projHasOutput = true
+					}
+				}
+			}
+
+			if projHasOutput {
+				areaSb.WriteString(fmt.Sprintf("    %s:\n", proj.Title))
+				areaSb.WriteString(projSb.String())
+				areaHasOutput = true
+			}
+		}
+
+		// Direct area tasks
+		for _, t := range area.Tasks {
+			if seenTasks[t.UUID] {
+				continue
+			}
+			if !areaHasOutput {
+				areaHasOutput = true
+			}
+			seenTasks[t.UUID] = true
+			areaSb.WriteString(fmt.Sprintf("    - %s (ID: %s", t.Title, shortID(t.UUID)))
+			if t.Due != "" {
+				areaSb.WriteString(fmt.Sprintf(", deadline: %s", t.Due[:10]))
+			}
+			areaSb.WriteString(")\n")
+		}
+
+		if areaHasOutput {
+			sb.WriteString(fmt.Sprintf("  %s:\n", area.Title))
+			sb.WriteString(areaSb.String())
+		}
+	}
+
+	return sb.String()
+}
+
+// writeTaskLine writes a formatted task line to the builder
+func writeTaskLine(sb *strings.Builder, t models.TaskJSON, extraIndent int) {
+	indent := strings.Repeat("  ", extraIndent)
+	sb.WriteString(fmt.Sprintf("%s  - %s (ID: %s", indent, t.Title, shortID(t.UUID)))
+	if t.Due != "" && len(t.Due) >= 10 {
+		sb.WriteString(fmt.Sprintf(", deadline: %s", t.Due[:10]))
+	}
+	sb.WriteString(")\n")
+}
+
+// shortID returns first 8 characters of UUID
+func shortID(uuid string) string {
+	if len(uuid) > 8 {
+		return uuid[:8]
+	}
+	return uuid
 }
