@@ -90,6 +90,58 @@ func (f *TableFormatter) FormatTasks(tasks []models.Task) error {
 	return nil
 }
 
+// FormatLogbook formats completed tasks with completion dates
+func (f *TableFormatter) FormatLogbook(tasks []models.Task) error {
+	if len(tasks) == 0 {
+		fmt.Println(f.style(yellow, "No completed tasks found"))
+		return nil
+	}
+
+	for _, task := range tasks {
+		// Show short ID (first 8 chars of UUID)
+		shortID := task.UUID
+		if len(shortID) > 8 {
+			shortID = shortID[:8]
+		}
+
+		// Completion date
+		completed := ""
+		if task.Completed.Valid {
+			completed = task.Completed.Time.Format("2006-01-02")
+		}
+
+		// Build context parts
+		var context []string
+		// Show Area > Project > Heading hierarchy
+		var hierarchy []string
+		if task.AreaName.Valid && task.AreaName.String != "" {
+			hierarchy = append(hierarchy, f.style(magenta, task.AreaName.String))
+		}
+		if task.ProjectName.Valid && task.ProjectName.String != "" {
+			hierarchy = append(hierarchy, f.style(blue, task.ProjectName.String))
+		}
+		if task.HeadingName.Valid && task.HeadingName.String != "" {
+			hierarchy = append(hierarchy, f.style(cyan, task.HeadingName.String))
+		}
+		if len(hierarchy) > 0 {
+			context = append(context, strings.Join(hierarchy, f.style(dim, " > ")))
+		}
+
+		line := fmt.Sprintf("%s %s %s %s",
+			f.style(green, completed),
+			f.style(dim, shortID),
+			f.style(dim, "✓"),
+			f.style(cyan, task.Title))
+		if len(context) > 0 {
+			line += " " + f.style(dim, "(") + strings.Join(context, f.style(dim, ", ")) + f.style(dim, ")")
+		}
+		fmt.Println(line)
+	}
+
+	fmt.Println(f.style(dim, fmt.Sprintf("\n%d completed task(s)", len(tasks))))
+	return nil
+}
+
 // FormatTask formats a single task with full details
 func (f *TableFormatter) FormatTask(task *models.Task) error {
 	fmt.Println(f.style(headerStyle, "Task Details"))

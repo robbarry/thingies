@@ -49,5 +49,5 @@ func runLogbook(cmd *cobra.Command, args []string) error {
 	}
 
 	formatter := output.NewTableFormatter(shared.IsNoColor(cmd))
-	return formatter.FormatTasks(tasks)
+	return formatter.FormatLogbook(tasks)
 }
