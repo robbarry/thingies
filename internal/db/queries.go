@@ -32,7 +32,7 @@ func (db *ThingsDB) ListTasks(filter TaskFilter) ([]models.Task, error) {
 			t.startDate,
 			t.deadline,
 			t.stopDate,
-			a.title as area_name,
+			COALESCE(a.title, pa.title) as area_name,
 			p.title as project_name,
 			GROUP_CONCAT(tag.title, ', ') as tags,
 			CASE WHEN t.rt1_repeatingTemplate IS NOT NULL THEN 1 ELSE 0 END as is_repeating,
@@ -40,6 +40,7 @@ func (db *ThingsDB) ListTasks(filter TaskFilter) ([]models.Task, error) {
 		FROM TMTask t
 		LEFT JOIN TMArea a ON t.area = a.uuid
 		LEFT JOIN TMTask p ON t.project = p.uuid AND p.type = 1 AND p.trashed = 0
+		LEFT JOIN TMArea pa ON p.area = pa.uuid
 		LEFT JOIN TMTask p2 ON t.project = p2.uuid AND p2.type = 1
 		LEFT JOIN TMTask h ON t.heading = h.uuid
 		LEFT JOIN TMTask hp ON h.project = hp.uuid AND hp.type = 1
@@ -64,9 +65,17 @@ func (db *ThingsDB) ListTasks(filter TaskFilter) ([]models.Task, error) {
 	// "all" - no filter
 	}
 
-	// Today filter
+	// Today filter based on things.py logic:
+	// 1. Anytime tasks with start dates (start=1, startDate set)
+	// 2. Someday tasks with past start dates (start=2, startDate <= today)
+	// 3. Overdue tasks by deadline (no startDate, deadline <= today, not suppressed)
 	if filter.Today {
-		conditions = append(conditions, "t.todayIndex > 0")
+		todayPacked := TodayPackedDate()
+		conditions = append(conditions, fmt.Sprintf(`(
+			(t.start = 1 AND t.startDate IS NOT NULL)
+			OR (t.start = 2 AND t.startDate IS NOT NULL AND t.startDate <= %d)
+			OR (t.startDate IS NULL AND t.deadline IS NOT NULL AND t.deadline <= %d AND t.deadlineSuppressionDate IS NULL)
+		)`, todayPacked, todayPacked))
 	}
 
 	// Area filter
@@ -81,9 +90,10 @@ func (db *ThingsDB) ListTasks(filter TaskFilter) ([]models.Task, error) {
 		params = append(params, "%"+filter.Project+"%")
 	}
 
-	// Future repeating tasks filter
+	// Future repeating tasks filter (startDate is packed date format, not Unix timestamp)
 	if !filter.IncludeFuture {
-		conditions = append(conditions, "(t.rt1_repeatingTemplate IS NULL OR t.startDate IS NULL OR t.startDate <= strftime('%s', 'now'))")
+		todayPacked := TodayPackedDate()
+		conditions = append(conditions, fmt.Sprintf("(t.rt1_repeatingTemplate IS NULL OR t.startDate IS NULL OR t.startDate <= %d)", todayPacked))
 	}
 
 	if len(conditions) > 0 {
@@ -123,7 +133,7 @@ func (db *ThingsDB) GetTask(uuid string) (*models.Task, error) {
 			t.startDate,
 			t.deadline,
 			t.stopDate,
-			a.title as area_name,
+			COALESCE(a.title, pa.title) as area_name,
 			p.title as project_name,
 			GROUP_CONCAT(tag.title, ', ') as tags,
 			CASE WHEN t.rt1_repeatingTemplate IS NOT NULL THEN 1 ELSE 0 END as is_repeating,
@@ -131,6 +141,7 @@ func (db *ThingsDB) GetTask(uuid string) (*models.Task, error) {
 		FROM TMTask t
 		LEFT JOIN TMArea a ON t.area = a.uuid
 		LEFT JOIN TMTask p ON t.project = p.uuid AND p.type = 1
+		LEFT JOIN TMArea pa ON p.area = pa.uuid
 		LEFT JOIN TMTaskTag tt ON t.uuid = tt.tasks
 		LEFT JOIN TMTag tag ON tt.tags = tag.uuid
 		WHERE t.uuid = ?
@@ -237,7 +248,7 @@ func (db *ThingsDB) GetProjectTasks(projectUUID string, includeCompleted bool) (
 			t.startDate,
 			t.deadline,
 			t.stopDate,
-			a.title as area_name,
+			COALESCE(a.title, pa.title) as area_name,
 			p.title as project_name,
 			GROUP_CONCAT(tag.title, ', ') as tags,
 			CASE WHEN t.rt1_repeatingTemplate IS NOT NULL THEN 1 ELSE 0 END as is_repeating,
@@ -245,6 +256,7 @@ func (db *ThingsDB) GetProjectTasks(projectUUID string, includeCompleted bool) (
 		FROM TMTask t
 		LEFT JOIN TMArea a ON t.area = a.uuid
 		LEFT JOIN TMTask p ON t.project = p.uuid AND p.type = 1
+		LEFT JOIN TMArea pa ON p.area = pa.uuid
 		LEFT JOIN TMTaskTag tt ON t.uuid = tt.tasks
 		LEFT JOIN TMTag tag ON tt.tags = tag.uuid
 		WHERE t.project = ? AND t.type = 0 AND t.trashed = 0
@@ -444,7 +456,7 @@ func (db *ThingsDB) Search(term string, includeNotes, includeFuture bool) ([]mod
 			t.startDate,
 			t.deadline,
 			t.stopDate,
-			a.title as area_name,
+			COALESCE(a.title, pa.title) as area_name,
 			p.title as project_name,
 			GROUP_CONCAT(tag.title, ', ') as tags,
 			CASE WHEN t.rt1_repeatingTemplate IS NOT NULL THEN 1 ELSE 0 END as is_repeating,
@@ -452,6 +464,7 @@ func (db *ThingsDB) Search(term string, includeNotes, includeFuture bool) ([]mod
 		FROM TMTask t
 		LEFT JOIN TMArea a ON t.area = a.uuid
 		LEFT JOIN TMTask p ON t.project = p.uuid AND p.type = 1 AND p.trashed = 0
+		LEFT JOIN TMArea pa ON p.area = pa.uuid
 		LEFT JOIN TMTask p2 ON t.project = p2.uuid AND p2.type = 1
 		LEFT JOIN TMTask h ON t.heading = h.uuid
 		LEFT JOIN TMTask hp ON h.project = hp.uuid AND hp.type = 1
@@ -473,7 +486,8 @@ func (db *ThingsDB) Search(term string, includeNotes, includeFuture bool) ([]mod
 	query += ")"
 
 	if !includeFuture {
-		query += " AND (t.rt1_repeatingTemplate IS NULL OR t.startDate IS NULL OR t.startDate <= strftime('%s', 'now'))"
+		todayPacked := TodayPackedDate()
+		query += fmt.Sprintf(" AND (t.rt1_repeatingTemplate IS NULL OR t.startDate IS NULL OR t.startDate <= %d)", todayPacked)
 	}
 
 	query += ` GROUP BY t.uuid ORDER BY t.type, t."index"`

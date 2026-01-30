@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	_ "modernc.org/sqlite"
 )
@@ -88,4 +89,11 @@ func (db *ThingsDB) Conn() *sql.DB {
 // Path returns the database path
 func (db *ThingsDB) Path() string {
 	return db.path
+}
+
+// TodayPackedDate returns today's date in Things packed format
+// Things packs dates as: year << 16 | month << 12 | day << 7
+func TodayPackedDate() int {
+	now := time.Now()
+	return (now.Year() << 16) | (int(now.Month()) << 12) | (now.Day() << 7)
 }

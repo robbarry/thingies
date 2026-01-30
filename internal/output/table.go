@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
-	"github.com/charmbracelet/lipgloss/table"
 	"thingies/internal/models"
 )
 
@@ -38,56 +37,50 @@ func (f *TableFormatter) style(s lipgloss.Style, text string) string {
 	return s.Render(text)
 }
 
-// FormatTasks formats a list of tasks as a table
+// FormatTasks formats a list of tasks
 func (f *TableFormatter) FormatTasks(tasks []models.Task) error {
 	if len(tasks) == 0 {
 		fmt.Println(f.style(yellow, "No tasks found"))
 		return nil
 	}
 
-	t := table.New().
-		Border(lipgloss.RoundedBorder()).
-		BorderStyle(lipgloss.NewStyle().Foreground(lipgloss.Color("8"))).
-		Headers("Title", "Status", "Project", "Area", "Due", "Tags")
-
 	for _, task := range tasks {
+		// Show short ID (first 8 chars of UUID)
+		shortID := task.UUID
+		if len(shortID) > 8 {
+			shortID = shortID[:8]
+		}
+
 		status := models.TaskStatus(task.Status).Icon()
 		if task.IsRepeating {
 			status += " 🔁"
 		}
 
-		due := ""
+		// Build context parts
+		var context []string
+		// Show Area > Project hierarchy when both exist
+		if task.AreaName.Valid && task.AreaName.String != "" && task.ProjectName.Valid && task.ProjectName.String != "" {
+			context = append(context, f.style(magenta, task.AreaName.String)+f.style(dim, " > ")+f.style(blue, task.ProjectName.String))
+		} else if task.ProjectName.Valid && task.ProjectName.String != "" {
+			context = append(context, f.style(blue, task.ProjectName.String))
+		} else if task.AreaName.Valid && task.AreaName.String != "" {
+			context = append(context, f.style(magenta, task.AreaName.String))
+		}
 		if task.Deadline.Valid {
-			due = task.Deadline.Time.Format("2006-01-02")
+			context = append(context, f.style(red, task.Deadline.Time.Format("2006-01-02")))
+		}
+		if task.Tags.Valid && task.Tags.String != "" {
+			context = append(context, f.style(yellow, task.Tags.String))
 		}
 
-		projectName := ""
-		if task.ProjectName.Valid {
-			projectName = task.ProjectName.String
+		line := fmt.Sprintf("%s %s %s", f.style(dim, shortID), f.style(green, status), f.style(cyan, task.Title))
+		if len(context) > 0 {
+			line += " " + f.style(dim, "(") + strings.Join(context, f.style(dim, ", ")) + f.style(dim, ")")
 		}
-
-		areaName := ""
-		if task.AreaName.Valid {
-			areaName = task.AreaName.String
-		}
-
-		tags := ""
-		if task.Tags.Valid {
-			tags = task.Tags.String
-		}
-
-		t.Row(
-			f.style(cyan, task.Title),
-			f.style(green, status),
-			f.style(blue, projectName),
-			f.style(magenta, areaName),
-			f.style(red, due),
-			f.style(yellow, tags),
-		)
+		fmt.Println(line)
 	}
 
-	fmt.Println(t)
-	fmt.Println(f.style(dim, fmt.Sprintf("\nFound %d task(s)", len(tasks))))
+	fmt.Println(f.style(dim, fmt.Sprintf("\n%d task(s)", len(tasks))))
 	return nil
 }
 
@@ -139,41 +132,40 @@ func (f *TableFormatter) FormatTask(task *models.Task) error {
 	return nil
 }
 
-// FormatProjects formats a list of projects as a table
+// FormatProjects formats a list of projects
 func (f *TableFormatter) FormatProjects(projects []models.Project) error {
 	if len(projects) == 0 {
 		fmt.Println(f.style(yellow, "No projects found"))
 		return nil
 	}
 
-	t := table.New().
-		Border(lipgloss.RoundedBorder()).
-		BorderStyle(lipgloss.NewStyle().Foreground(lipgloss.Color("8"))).
-		Headers("Project", "Area", "Tasks", "Status")
-
 	for _, proj := range projects {
-		status := "Active"
-		if models.TaskStatus(proj.Status) == models.StatusCompleted {
-			status = "Completed"
-		}
-
-		areaName := ""
-		if proj.AreaName.Valid {
-			areaName = proj.AreaName.String
+		// Show short ID (first 8 chars of UUID)
+		shortID := proj.UUID
+		if len(shortID) > 8 {
+			shortID = shortID[:8]
 		}
 
 		taskCount := fmt.Sprintf("%d/%d", proj.OpenTasks, proj.TotalTasks)
 
-		t.Row(
-			f.style(cyan, proj.Title),
-			f.style(magenta, areaName),
-			f.style(green, taskCount),
-			f.style(yellow, status),
-		)
+		// Build context parts
+		var context []string
+		if proj.AreaName.Valid && proj.AreaName.String != "" {
+			context = append(context, f.style(magenta, proj.AreaName.String))
+		}
+		context = append(context, f.style(green, taskCount))
+		if models.TaskStatus(proj.Status) == models.StatusCompleted {
+			context = append(context, f.style(yellow, "Completed"))
+		}
+
+		line := fmt.Sprintf("%s %s", f.style(dim, shortID), f.style(cyan, proj.Title))
+		if len(context) > 0 {
+			line += " " + f.style(dim, "(") + strings.Join(context, f.style(dim, ", ")) + f.style(dim, ")")
+		}
+		fmt.Println(line)
 	}
 
-	fmt.Println(t)
-	fmt.Println(f.style(dim, fmt.Sprintf("\nFound %d project(s)", len(projects))))
+	fmt.Println(f.style(dim, fmt.Sprintf("\n%d project(s)", len(projects))))
 	return nil
 }
 
@@ -209,28 +201,32 @@ func (f *TableFormatter) FormatProject(project *models.Project, tasks []models.T
 	return nil
 }
 
-// FormatAreas formats a list of areas as a table
+// FormatAreas formats a list of areas
 func (f *TableFormatter) FormatAreas(areas []models.Area) error {
 	if len(areas) == 0 {
 		fmt.Println(f.style(yellow, "No areas found"))
 		return nil
 	}
 
-	t := table.New().
-		Border(lipgloss.RoundedBorder()).
-		BorderStyle(lipgloss.NewStyle().Foreground(lipgloss.Color("8"))).
-		Headers("Area", "Open Tasks", "Active Projects")
-
 	for _, area := range areas {
-		t.Row(
-			f.style(cyan, area.Title),
+		// Show short ID (first 8 chars of UUID)
+		shortID := area.UUID
+		if len(shortID) > 8 {
+			shortID = shortID[:8]
+		}
+
+		context := fmt.Sprintf("%s tasks, %s projects",
 			f.style(green, fmt.Sprintf("%d", area.OpenTasks)),
-			f.style(blue, fmt.Sprintf("%d", area.ActiveProjects)),
-		)
+			f.style(blue, fmt.Sprintf("%d", area.ActiveProjects)))
+
+		line := fmt.Sprintf("%s %s %s",
+			f.style(dim, shortID),
+			f.style(cyan, area.Title),
+			f.style(dim, "("+context+")"))
+		fmt.Println(line)
 	}
 
-	fmt.Println(t)
-	fmt.Println(f.style(dim, fmt.Sprintf("\nFound %d area(s)", len(areas))))
+	fmt.Println(f.style(dim, fmt.Sprintf("\n%d area(s)", len(areas))))
 	return nil
 }
 
@@ -258,78 +254,78 @@ func (f *TableFormatter) FormatArea(area *models.Area, projects []models.Project
 	return nil
 }
 
-// FormatTags formats a list of tags as a table
+// FormatTags formats a list of tags
 func (f *TableFormatter) FormatTags(tags []models.Tag) error {
 	if len(tags) == 0 {
 		fmt.Println(f.style(yellow, "No tags found"))
 		return nil
 	}
 
-	t := table.New().
-		Border(lipgloss.RoundedBorder()).
-		BorderStyle(lipgloss.NewStyle().Foreground(lipgloss.Color("8"))).
-		Headers("Tag", "Shortcut", "Tasks")
-
 	for _, tag := range tags {
-		shortcut := ""
-		if tag.Shortcut.Valid {
-			shortcut = tag.Shortcut.String
+		// Show short ID (first 8 chars of UUID)
+		shortID := tag.UUID
+		if len(shortID) > 8 {
+			shortID = shortID[:8]
 		}
 
-		t.Row(
+		var context []string
+		if tag.Shortcut.Valid && tag.Shortcut.String != "" {
+			context = append(context, f.style(yellow, tag.Shortcut.String))
+		}
+		context = append(context, f.style(green, fmt.Sprintf("%d tasks", tag.TaskCount)))
+
+		line := fmt.Sprintf("%s %s %s",
+			f.style(dim, shortID),
 			f.style(cyan, tag.Title),
-			f.style(yellow, shortcut),
-			f.style(green, fmt.Sprintf("%d", tag.TaskCount)),
-		)
+			f.style(dim, "("+strings.Join(context, ", ")+")"))
+		fmt.Println(line)
 	}
 
-	fmt.Println(t)
-	fmt.Println(f.style(dim, fmt.Sprintf("\nFound %d tag(s)", len(tags))))
+	fmt.Println(f.style(dim, fmt.Sprintf("\n%d tag(s)", len(tags))))
 	return nil
 }
 
-// FormatSearchResults formats search results as a table
+// FormatSearchResults formats search results
 func (f *TableFormatter) FormatSearchResults(tasks []models.Task, term string) error {
 	if len(tasks) == 0 {
 		fmt.Println(f.style(yellow, fmt.Sprintf("No results found for '%s'", term)))
 		return nil
 	}
 
-	fmt.Println(f.style(headerStyle, fmt.Sprintf("Search Results for '%s'", term)))
-
-	t := table.New().
-		Border(lipgloss.RoundedBorder()).
-		BorderStyle(lipgloss.NewStyle().Foreground(lipgloss.Color("8"))).
-		Headers("Type", "Title", "Project", "Area", "Status")
-
 	for _, task := range tasks {
+		// Show short ID (first 8 chars of UUID)
+		shortID := task.UUID
+		if len(shortID) > 8 {
+			shortID = shortID[:8]
+		}
+
 		typeName := task.Type.String()
 		status := task.Status.String()
 		if task.Type == models.TypeTask && task.IsRepeating {
 			status += " 🔁"
 		}
 
-		projectName := ""
-		if task.ProjectName.Valid {
-			projectName = task.ProjectName.String
+		// Build context parts
+		var context []string
+		context = append(context, f.style(yellow, typeName))
+		// Show Area > Project hierarchy when both exist
+		if task.AreaName.Valid && task.AreaName.String != "" && task.ProjectName.Valid && task.ProjectName.String != "" {
+			context = append(context, f.style(magenta, task.AreaName.String)+f.style(dim, " > ")+f.style(blue, task.ProjectName.String))
+		} else if task.ProjectName.Valid && task.ProjectName.String != "" {
+			context = append(context, f.style(blue, task.ProjectName.String))
+		} else if task.AreaName.Valid && task.AreaName.String != "" {
+			context = append(context, f.style(magenta, task.AreaName.String))
 		}
+		context = append(context, f.style(green, status))
 
-		areaName := ""
-		if task.AreaName.Valid {
-			areaName = task.AreaName.String
-		}
-
-		t.Row(
-			f.style(yellow, typeName),
+		line := fmt.Sprintf("%s %s %s",
+			f.style(dim, shortID),
 			f.style(cyan, task.Title),
-			f.style(blue, projectName),
-			f.style(magenta, areaName),
-			f.style(green, status),
-		)
+			f.style(dim, "("+strings.Join(context, ", ")+")"))
+		fmt.Println(line)
 	}
 
-	fmt.Println(t)
-	fmt.Println(f.style(dim, fmt.Sprintf("\nFound %d result(s)", len(tasks))))
+	fmt.Println(f.style(dim, fmt.Sprintf("\n%d result(s)", len(tasks))))
 	return nil
 }
 
