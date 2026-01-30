@@ -50,7 +50,7 @@ func (db *ThingsDB) ListTasks(filter TaskFilter) ([]models.Task, error) {
 		LEFT JOIN TMTag tag ON tt.tags = tag.uuid
 		WHERE t.type = 0 AND t.trashed = 0
 			AND (t.project IS NULL OR p2.trashed = 0)
-			AND (h.uuid IS NULL OR hp.uuid IS NULL OR hp.trashed = 0)
+			AND (hp.trashed IS NULL OR hp.trashed = 0)
 	`
 
 	var conditions []string
@@ -485,7 +485,7 @@ func (db *ThingsDB) Search(term string, includeNotes, includeFuture bool) ([]mod
 		LEFT JOIN TMTag tag ON tt.tags = tag.uuid
 		WHERE t.trashed = 0
 			AND (t.project IS NULL OR p2.trashed = 0)
-			AND (h.uuid IS NULL OR hp.uuid IS NULL OR hp.trashed = 0)
+			AND (hp.trashed IS NULL OR hp.trashed = 0)
 			AND (LOWER(t.title) LIKE LOWER(?)
 	`
 
@@ -546,7 +546,7 @@ func (db *ThingsDB) GetInboxTasks() ([]models.Task, error) {
 		WHERE t.type = 0 AND t.trashed = 0 AND t.status = 0
 			AND t.start = 0
 			AND (t.project IS NULL OR p.trashed = 0)
-			AND (t.heading IS NULL OR hp.uuid IS NULL OR hp.trashed = 0)
+			AND (hp.trashed IS NULL OR hp.trashed = 0)
 		GROUP BY t.uuid
 		ORDER BY t."index"
 	`
@@ -594,7 +594,7 @@ func (db *ThingsDB) GetUpcomingTasks() ([]models.Task, error) {
 			AND t.start = 2
 			AND t.startDate IS NOT NULL AND t.startDate > %d
 			AND (t.project IS NULL OR p.trashed = 0)
-			AND (t.heading IS NULL OR hp.uuid IS NULL OR hp.trashed = 0)
+			AND (hp.trashed IS NULL OR hp.trashed = 0)
 		GROUP BY t.uuid
 		ORDER BY t.startDate, t."index"
 	`, todayPacked)
@@ -641,7 +641,7 @@ func (db *ThingsDB) GetSomedayTasks() ([]models.Task, error) {
 			AND t.start = 2
 			AND t.startDate IS NULL
 			AND (t.project IS NULL OR p.trashed = 0)
-			AND (t.heading IS NULL OR hp.uuid IS NULL OR hp.trashed = 0)
+			AND (hp.trashed IS NULL OR hp.trashed = 0)
 		GROUP BY t.uuid
 		ORDER BY t."index"
 	`
@@ -699,7 +699,7 @@ func (db *ThingsDB) GetLogbook(limit int) ([]models.Task, error) {
 		LEFT JOIN TMTag tag ON tt.tags = tag.uuid
 		WHERE t.type = 0 AND t.trashed = 0 AND t.status = 3
 			AND (t.project IS NULL OR p.trashed = 0)
-			AND (t.heading IS NULL OR hp.uuid IS NULL OR hp.trashed = 0)
+			AND (hp.trashed IS NULL OR hp.trashed = 0)
 		GROUP BY t.uuid
 		ORDER BY t.stopDate DESC
 		LIMIT %d
