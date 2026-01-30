@@ -13,10 +13,11 @@ import (
 )
 
 var snapshotCmd = &cobra.Command{
-	Use:   "snapshot",
-	Short: "Show hierarchical view",
-	Long:  `Show a hierarchical view of all areas, projects, and tasks.`,
-	RunE:  runSnapshot,
+	Use:     "snapshot",
+	Aliases: []string{"all"},
+	Short:   "Show hierarchical view",
+	Long:    `Show a hierarchical view of all areas, projects, and tasks.`,
+	RunE:    runSnapshot,
 }
 
 type snapshotArea struct {
@@ -31,9 +32,11 @@ type snapshotProject struct {
 }
 
 type snapshotOutput struct {
-	Areas   []snapshotArea    `json:"areas"`
-	Inbox   []models.TaskJSON `json:"inbox"`
-	Today   []models.TaskJSON `json:"today"`
+	Today    []models.TaskJSON `json:"today"`
+	Inbox    []models.TaskJSON `json:"inbox"`
+	Upcoming []models.TaskJSON `json:"upcoming"`
+	Someday  []models.TaskJSON `json:"someday"`
+	Areas    []snapshotArea    `json:"areas"`
 }
 
 func runSnapshot(cmd *cobra.Command, args []string) error {
@@ -106,6 +109,24 @@ func runSnapshot(cmd *cobra.Command, args []string) error {
 		output.Today = append(output.Today, t.ToJSON())
 	}
 
+	// Get upcoming
+	upcomingTasks, err := thingsDB.GetUpcomingTasks()
+	if err != nil {
+		return err
+	}
+	for _, t := range upcomingTasks {
+		output.Upcoming = append(output.Upcoming, t.ToJSON())
+	}
+
+	// Get someday
+	somedayTasks, err := thingsDB.GetSomedayTasks()
+	if err != nil {
+		return err
+	}
+	for _, t := range somedayTasks {
+		output.Someday = append(output.Someday, t.ToJSON())
+	}
+
 	if shared.IsJSON(cmd) {
 		data, err := json.MarshalIndent(output, "", "  ")
 		if err != nil {
@@ -124,8 +145,10 @@ func printSnapshot(output snapshotOutput, noColor bool) error {
 		headerStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("12"))
 		areaStyle   = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("5"))
 		projStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("4"))
-		taskStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("7"))
+		taskStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("6"))
+		idStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("8"))
 		countStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("8"))
+		dateStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("2"))
 	)
 
 	if noColor {
@@ -133,23 +156,57 @@ func printSnapshot(output snapshotOutput, noColor bool) error {
 		areaStyle = lipgloss.NewStyle()
 		projStyle = lipgloss.NewStyle()
 		taskStyle = lipgloss.NewStyle()
+		idStyle = lipgloss.NewStyle()
 		countStyle = lipgloss.NewStyle()
+		dateStyle = lipgloss.NewStyle()
+	}
+
+	shortID := func(uuid string) string {
+		if len(uuid) > 8 {
+			return uuid[:8]
+		}
+		return uuid
 	}
 
 	// Today
 	if len(output.Today) > 0 {
-		fmt.Println(headerStyle.Render("📅 Today"))
+		fmt.Printf("%s %s\n", headerStyle.Render("📅 Today"), countStyle.Render(fmt.Sprintf("(%d)", len(output.Today))))
 		for _, t := range output.Today {
-			fmt.Printf("  %s %s\n", models.StatusIncomplete.Icon(), taskStyle.Render(t.Title))
+			fmt.Printf("  %s %s %s\n", idStyle.Render(shortID(t.UUID)), models.StatusIncomplete.Icon(), taskStyle.Render(t.Title))
 		}
 		fmt.Println()
 	}
 
 	// Inbox
 	if len(output.Inbox) > 0 {
-		fmt.Println(headerStyle.Render("📥 Inbox"))
+		fmt.Printf("%s %s\n", headerStyle.Render("📥 Inbox"), countStyle.Render(fmt.Sprintf("(%d)", len(output.Inbox))))
 		for _, t := range output.Inbox {
-			fmt.Printf("  %s %s\n", models.StatusIncomplete.Icon(), taskStyle.Render(t.Title))
+			fmt.Printf("  %s %s %s\n", idStyle.Render(shortID(t.UUID)), models.StatusIncomplete.Icon(), taskStyle.Render(t.Title))
+		}
+		fmt.Println()
+	}
+
+	// Upcoming
+	if len(output.Upcoming) > 0 {
+		fmt.Printf("%s %s\n", headerStyle.Render("📆 Upcoming"), countStyle.Render(fmt.Sprintf("(%d)", len(output.Upcoming))))
+		for _, t := range output.Upcoming {
+			scheduled := ""
+			if t.Scheduled != "" {
+				// Extract just the date part (YYYY-MM-DD) from ISO format
+				if len(t.Scheduled) >= 10 {
+					scheduled = " " + dateStyle.Render(t.Scheduled[:10])
+				}
+			}
+			fmt.Printf("  %s %s %s%s\n", idStyle.Render(shortID(t.UUID)), models.StatusIncomplete.Icon(), taskStyle.Render(t.Title), scheduled)
+		}
+		fmt.Println()
+	}
+
+	// Someday
+	if len(output.Someday) > 0 {
+		fmt.Printf("%s %s\n", headerStyle.Render("💭 Someday"), countStyle.Render(fmt.Sprintf("(%d)", len(output.Someday))))
+		for _, t := range output.Someday {
+			fmt.Printf("  %s %s %s\n", idStyle.Render(shortID(t.UUID)), models.StatusIncomplete.Icon(), taskStyle.Render(t.Title))
 		}
 		fmt.Println()
 	}
@@ -161,30 +218,28 @@ func printSnapshot(output snapshotOutput, noColor bool) error {
 			areaCount += len(p.Tasks)
 		}
 
-		fmt.Printf("%s %s\n", areaStyle.Render("■ "+area.Title), countStyle.Render(fmt.Sprintf("(%d)", areaCount)))
+		fmt.Printf("%s %s %s\n", idStyle.Render(shortID(area.UUID)), areaStyle.Render("■ "+area.Title), countStyle.Render(fmt.Sprintf("(%d)", areaCount)))
 
 		// Projects
 		for _, proj := range area.Projects {
 			taskCount := len(proj.Tasks)
-			fmt.Printf("  %s %s\n", projStyle.Render("▸ "+proj.Title), countStyle.Render(fmt.Sprintf("(%d)", taskCount)))
+			fmt.Printf("  %s %s %s\n", idStyle.Render(shortID(proj.UUID)), projStyle.Render("▸ "+proj.Title), countStyle.Render(fmt.Sprintf("(%d)", taskCount)))
 
 			for _, t := range proj.Tasks {
-				icon := models.StatusIncomplete.Icon()
-				fmt.Printf("    %s %s\n", icon, taskStyle.Render(t.Title))
+				fmt.Printf("    %s %s %s\n", idStyle.Render(shortID(t.UUID)), models.StatusIncomplete.Icon(), taskStyle.Render(t.Title))
 			}
 		}
 
 		// Direct tasks
 		for _, t := range area.Tasks {
-			icon := models.StatusIncomplete.Icon()
-			fmt.Printf("  %s %s\n", icon, taskStyle.Render(t.Title))
+			fmt.Printf("  %s %s %s\n", idStyle.Render(shortID(t.UUID)), models.StatusIncomplete.Icon(), taskStyle.Render(t.Title))
 		}
 
 		fmt.Println()
 	}
 
 	// Summary
-	totalTasks := len(output.Inbox) + len(output.Today)
+	totalTasks := len(output.Inbox) + len(output.Today) + len(output.Upcoming) + len(output.Someday)
 	for _, a := range output.Areas {
 		totalTasks += len(a.Tasks)
 		for _, p := range a.Projects {
