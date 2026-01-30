@@ -25,7 +25,8 @@ func (s *Server) handleDeleteHeading(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.writeJSON(w, http.StatusOK, map[string]string{
+	w.WriteHeader(http.StatusOK)
+	s.writeJSON(w, map[string]string{
 		"status": "deleted",
 		"uuid":   uuid,
 	})
@@ -55,23 +56,10 @@ func (s *Server) handleUpdateHeading(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.writeJSON(w, http.StatusOK, map[string]string{
+	w.WriteHeader(http.StatusOK)
+	s.writeJSON(w, map[string]string{
 		"status": "updated",
 		"uuid":   uuid,
 		"title":  req.Title,
-	})
-}
-
-// writeJSON writes a JSON response
-func (s *Server) writeJSON(w http.ResponseWriter, status int, data interface{}) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(data)
-}
-
-// writeError writes an error JSON response
-func (s *Server) writeError(w http.ResponseWriter, status int, message string) {
-	s.writeJSON(w, status, map[string]string{
-		"error": message,
 	})
 }
