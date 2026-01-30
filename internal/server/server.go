@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -79,6 +80,16 @@ func (s *Server) registerRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /projects/{uuid}", s.handleGetProject)
 	mux.HandleFunc("GET /projects/{uuid}/tasks", s.handleGetProjectTasks)
 	mux.HandleFunc("GET /projects/{uuid}/headings", s.handleGetProjectHeadings)
+
+	// Area routes
+	mux.HandleFunc("GET /areas", s.handleListAreas)
+	mux.HandleFunc("GET /areas/{uuid}", s.handleGetArea)
+	mux.HandleFunc("GET /areas/{uuid}/tasks", s.handleGetAreaTasks)
+	mux.HandleFunc("GET /areas/{uuid}/projects", s.handleGetAreaProjects)
+
+	// Tag routes
+	mux.HandleFunc("GET /tags", s.handleListTags)
+	mux.HandleFunc("GET /tags/{name}/tasks", s.handleGetTagTasks)
 
 	// Heading routes
 	mux.HandleFunc("DELETE /headings/{uuid}", s.handleDeleteHeading)
@@ -512,4 +523,135 @@ func shortID(uuid string) string {
 		return uuid[:8]
 	}
 	return uuid
+}
+
+// handleListAreas returns all visible areas
+func (s *Server) handleListAreas(w http.ResponseWriter, r *http.Request) {
+	areas, err := s.db.ListAreas()
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, areas)
+}
+
+// handleGetArea returns a single area by UUID
+func (s *Server) handleGetArea(w http.ResponseWriter, r *http.Request) {
+	uuid := r.PathValue("uuid")
+	if uuid == "" {
+		writeError(w, http.StatusBadRequest, "uuid is required")
+		return
+	}
+
+	area, err := s.db.GetArea(uuid)
+	if err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			writeError(w, http.StatusNotFound, err.Error())
+			return
+		}
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, area)
+}
+
+// handleGetAreaTasks returns loose tasks in an area (not in projects)
+func (s *Server) handleGetAreaTasks(w http.ResponseWriter, r *http.Request) {
+	uuid := r.PathValue("uuid")
+	if uuid == "" {
+		writeError(w, http.StatusBadRequest, "uuid is required")
+		return
+	}
+
+	// Check if area exists first
+	_, err := s.db.GetArea(uuid)
+	if err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			writeError(w, http.StatusNotFound, err.Error())
+			return
+		}
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	includeCompleted := r.URL.Query().Get("include_completed") == "true"
+	tasks, err := s.db.GetAreaTasks(uuid, includeCompleted)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, tasks)
+}
+
+// handleGetAreaProjects returns projects in an area
+func (s *Server) handleGetAreaProjects(w http.ResponseWriter, r *http.Request) {
+	uuid := r.PathValue("uuid")
+	if uuid == "" {
+		writeError(w, http.StatusBadRequest, "uuid is required")
+		return
+	}
+
+	// Check if area exists first
+	_, err := s.db.GetArea(uuid)
+	if err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			writeError(w, http.StatusNotFound, err.Error())
+			return
+		}
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	includeCompleted := r.URL.Query().Get("include_completed") == "true"
+	projects, err := s.db.GetAreaProjects(uuid, includeCompleted)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, projects)
+}
+
+// handleListTags returns all tags with usage counts
+func (s *Server) handleListTags(w http.ResponseWriter, r *http.Request) {
+	tags, err := s.db.ListTags()
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	// Convert to JSON-serializable form
+	result := make([]interface{}, len(tags))
+	for i, tag := range tags {
+		result[i] = tag.ToJSON()
+	}
+
+	writeJSON(w, http.StatusOK, result)
+}
+
+// handleGetTagTasks returns tasks with a specific tag
+func (s *Server) handleGetTagTasks(w http.ResponseWriter, r *http.Request) {
+	name := r.PathValue("name")
+	if name == "" {
+		writeError(w, http.StatusBadRequest, "tag name is required")
+		return
+	}
+
+	// URL-decode the tag name to handle spaces and special characters
+	decodedName, err := url.PathUnescape(name)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid tag name encoding")
+		return
+	}
+
+	tasks, err := s.db.GetTasksByTag(decodedName)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, tasks)
 }
