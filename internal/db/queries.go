@@ -887,3 +887,37 @@ func (db *ThingsDB) GetTag(uuid string) (*models.Tag, error) {
 
 	return &tag, nil
 }
+
+// GetTaskChecklistItems returns checklist items for a task
+func (db *ThingsDB) GetTaskChecklistItems(taskUUID string) ([]models.ChecklistItem, error) {
+	query := `
+		SELECT
+			uuid,
+			title,
+			status,
+			"index"
+		FROM TMChecklistItem
+		WHERE task = ?
+		ORDER BY "index"
+	`
+
+	rows, err := db.conn.Query(query, taskUUID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query checklist items: %w", err)
+	}
+	defer rows.Close()
+
+	var items []models.ChecklistItem
+	for rows.Next() {
+		var item models.ChecklistItem
+		var status int
+		if err := rows.Scan(&item.UUID, &item.Title, &status, &item.Index); err != nil {
+			return nil, fmt.Errorf("failed to scan checklist item: %w", err)
+		}
+		// status: 0=incomplete, 3=completed (same as task status)
+		item.Completed = status == 3
+		items = append(items, item)
+	}
+
+	return items, rows.Err()
+}

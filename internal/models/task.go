@@ -23,8 +23,9 @@ type Task struct {
 	HeadingUUID sql.NullString `json:"heading_uuid,omitempty"`
 	HeadingName sql.NullString `json:"heading_name,omitempty"`
 	Tags        sql.NullString `json:"tags,omitempty"`
-	IsRepeating bool           `json:"is_repeating"`
-	TodayIndex  sql.NullInt64  `json:"today_index,omitempty"`
+	IsRepeating    bool            `json:"is_repeating"`
+	TodayIndex     sql.NullInt64   `json:"today_index,omitempty"`
+	ChecklistItems []ChecklistItem `json:"checklist_items,omitempty"`
 }
 
 // TaskJSON is the JSON-serializable version of Task
@@ -44,8 +45,9 @@ type TaskJSON struct {
 	ProjectName string `json:"project_name,omitempty"`
 	HeadingUUID string `json:"heading_uuid,omitempty"`
 	HeadingName string `json:"heading_name,omitempty"`
-	Tags        string `json:"tags,omitempty"`
-	IsRepeating bool   `json:"is_repeating"`
+	Tags           string          `json:"tags,omitempty"`
+	IsRepeating    bool            `json:"is_repeating"`
+	ChecklistItems []ChecklistItem `json:"checklist_items,omitempty"`
 }
 
 // ToJSON converts Task to its JSON-serializable form
@@ -66,8 +68,9 @@ func (t *Task) ToJSON() TaskJSON {
 		ProjectName: nullString(t.ProjectName),
 		HeadingUUID: nullString(t.HeadingUUID),
 		HeadingName: nullString(t.HeadingName),
-		Tags:        nullString(t.Tags),
-		IsRepeating: t.IsRepeating,
+		Tags:           nullString(t.Tags),
+		IsRepeating:    t.IsRepeating,
+		ChecklistItems: t.ChecklistItems,
 	}
 }
 
