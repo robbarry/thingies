@@ -32,6 +32,9 @@ func (db *ThingsDB) GetProjectUUIDByName(name string) (string, error) {
 		}
 		uuids = append(uuids, uuid)
 	}
+	if err := rows.Err(); err != nil {
+		return "", fmt.Errorf("error iterating projects: %w", err)
+	}
 
 	if len(uuids) == 0 {
 		return "", fmt.Errorf("project not found: %s", name)
@@ -59,6 +62,9 @@ func (db *ThingsDB) GetAreaUUIDByName(name string) (string, error) {
 			return "", err
 		}
 		uuids = append(uuids, uuid)
+	}
+	if err := rows.Err(); err != nil {
+		return "", fmt.Errorf("error iterating areas: %w", err)
 	}
 
 	if len(uuids) == 0 {
