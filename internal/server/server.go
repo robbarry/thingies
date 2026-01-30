@@ -51,15 +51,14 @@ func New(cfg Config, thingsDB *db.ThingsDB) *Server {
 func (s *Server) registerRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /health", s.handleHealth)
 
-	// Area endpoints
-	mux.HandleFunc("GET /areas", s.handleListAreas)
-	mux.HandleFunc("GET /areas/{uuid}", s.handleGetArea)
-	mux.HandleFunc("GET /areas/{uuid}/tasks", s.handleGetAreaTasks)
-	mux.HandleFunc("GET /areas/{uuid}/projects", s.handleGetAreaProjects)
-
-	// Tag endpoints
-	mux.HandleFunc("GET /tags", s.handleListTags)
-	mux.HandleFunc("GET /tags/{name}/tasks", s.handleGetTagTasks)
+	// Task write endpoints
+	mux.HandleFunc("POST /tasks", s.handleCreateTask)
+	mux.HandleFunc("PATCH /tasks/{uuid}", s.handleUpdateTask)
+	mux.HandleFunc("DELETE /tasks/{uuid}", s.handleDeleteTask)
+	mux.HandleFunc("POST /tasks/{uuid}/complete", s.handleCompleteTask)
+	mux.HandleFunc("POST /tasks/{uuid}/cancel", s.handleCancelTask)
+	mux.HandleFunc("POST /tasks/{uuid}/move-to-today", s.handleMoveTaskToToday)
+	mux.HandleFunc("POST /tasks/{uuid}/move-to-someday", s.handleMoveTaskToSomeday)
 }
 
 // withMiddleware wraps the handler with middleware
