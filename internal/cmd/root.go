@@ -48,6 +48,7 @@ func init() {
 	rootCmd.AddCommand(somedayCmd)
 	rootCmd.AddCommand(searchCmd)
 	rootCmd.AddCommand(snapshotCmd)
+	rootCmd.AddCommand(logbookCmd)
 }
 
 // GetDBPath returns the database path flag value
