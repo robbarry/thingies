@@ -18,7 +18,9 @@ type Task struct {
 	Deadline    sql.NullTime   `json:"due,omitempty"`
 	Completed   sql.NullTime   `json:"completed,omitempty"`
 	AreaName    sql.NullString `json:"area_name,omitempty"`
+	ProjectUUID sql.NullString `json:"project_uuid,omitempty"`
 	ProjectName sql.NullString `json:"project_name,omitempty"`
+	HeadingUUID sql.NullString `json:"heading_uuid,omitempty"`
 	HeadingName sql.NullString `json:"heading_name,omitempty"`
 	Tags        sql.NullString `json:"tags,omitempty"`
 	IsRepeating bool           `json:"is_repeating"`
@@ -38,7 +40,9 @@ type TaskJSON struct {
 	Due         string `json:"due,omitempty"`
 	Completed   string `json:"completed,omitempty"`
 	AreaName    string `json:"area_name,omitempty"`
+	ProjectUUID string `json:"project_uuid,omitempty"`
 	ProjectName string `json:"project_name,omitempty"`
+	HeadingUUID string `json:"heading_uuid,omitempty"`
 	HeadingName string `json:"heading_name,omitempty"`
 	Tags        string `json:"tags,omitempty"`
 	IsRepeating bool   `json:"is_repeating"`
@@ -58,7 +62,9 @@ func (t *Task) ToJSON() TaskJSON {
 		Due:         formatTime(t.Deadline),
 		Completed:   formatTime(t.Completed),
 		AreaName:    nullString(t.AreaName),
+		ProjectUUID: nullString(t.ProjectUUID),
 		ProjectName: nullString(t.ProjectName),
+		HeadingUUID: nullString(t.HeadingUUID),
 		HeadingName: nullString(t.HeadingName),
 		Tags:        nullString(t.Tags),
 		IsRepeating: t.IsRepeating,

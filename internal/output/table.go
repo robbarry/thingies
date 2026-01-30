@@ -156,7 +156,19 @@ func (f *TableFormatter) FormatTask(task *models.Task) error {
 	}
 
 	if task.ProjectName.Valid {
-		fmt.Printf("%s: %s\n", f.style(dim, "Project"), f.style(blue, task.ProjectName.String))
+		projectInfo := f.style(blue, task.ProjectName.String)
+		if task.ProjectUUID.Valid {
+			projectInfo += " " + f.style(dim, "("+task.ProjectUUID.String+")")
+		}
+		fmt.Printf("%s: %s\n", f.style(dim, "Project"), projectInfo)
+	}
+
+	if task.HeadingName.Valid {
+		headingInfo := f.style(cyan, task.HeadingName.String)
+		if task.HeadingUUID.Valid {
+			headingInfo += " " + f.style(dim, "("+task.HeadingUUID.String+")")
+		}
+		fmt.Printf("%s: %s\n", f.style(dim, "Heading"), headingInfo)
 	}
 
 	if task.AreaName.Valid {
