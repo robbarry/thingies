@@ -194,3 +194,19 @@ The `serve` command starts an HTTP server (default port 8484). All responses are
 - **No CGO**: Uses `modernc.org/sqlite` pure Go driver (no C compiler needed)
 - **Shell completions**: `thingies completion bash/zsh/fish`
 - **Go version**: Requires Go 1.21+ (current: 1.25.5 per go.mod)
+
+<!-- SKILL-MAINTENANCE-START -->
+## Skill Maintenance
+
+This tool has a corresponding skill in wsj-ai-skills at:
+`install/skills/things/`
+
+When making significant changes to this tool:
+1. Update the skill in wsj-ai-skills to reflect the changes
+2. Run `/skill-maintainer` to guide you through the update
+
+The skill should document:
+- Core commands and workflows
+- Common usage patterns
+- Non-obvious behaviors or gotchas
+<!-- SKILL-MAINTENANCE-END -->

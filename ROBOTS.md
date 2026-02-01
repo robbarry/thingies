@@ -1,528 +1,276 @@
-# thingies
 
-Go CLI and REST API for Things 3 task management on macOS.
+# Things 3 Task Management
 
-## Requirements
+## Behavioral Rules
 
-- macOS with Things 3 installed
-- Go 1.21+ (for building from source)
-- Things 3 app must be running for write operations
+- **Present ONE task at a time** (ADHD consideration)
+- Focus on completion over optimization
+- Create minimal tasks - only what's requested
+- Skip unnecessary detail unless asked
+- Provide concise answers
 
-## Installation
+When Rob asks "What's next?" or about tasks:
+1. Get snapshot for overview: `thingies snapshot`
+2. Check today's tasks: `thingies today`
+3. Check inbox for items needing processing: `thingies inbox`
 
-```bash
-git clone <repo> && cd thingies
-make build      # builds to bin/thingies
-make install    # copies to /usr/local/bin/thingies
+## Overview
+
+Things 3 is Rob's primary task management app (macOS/iOS). Two interfaces are available:
+
+1. **`thingies` CLI** (preferred) - Go binary with direct database access + AppleScript
+2. **REST API** (backup) - HTTP API running on VEGA over Tailscale
+
+**Always prefer the CLI** - it's faster, works offline, and doesn't require network access.
+
+## Data Structure
+
+```
+Area (top-level container)
+└── Project
+    └── Heading (section within project)
+        └── Task
 ```
 
-## Architecture
+### Current Areas
+| Area | Purpose |
+|------|---------|
+| **Work** | Work-related tasks and projects |
+| **Home** | Personal/household tasks and projects |
+| **Auto** | Container for AI-generated tasks |
 
-| Operation | Method | Notes |
-|-----------|--------|-------|
-| Read | SQLite | Direct database access, fast, no app launch |
-| Create | URL scheme | `things:///add`, launches Things briefly |
-| Update | AppleScript | Via osascript, may activate Things |
-| Delete | AppleScript | Via osascript, may activate Things |
-| Complete | AppleScript | Via osascript, may activate Things |
+### Special Projects
+| Project | Area | Description |
+|---------|------|-------------|
+| **Want To** | Home | Uses headings: Read, Buy, Do, Travel, Watch, Write |
+| **Bills** | Home | Recurring payments and financial tasks |
 
-Database path: `~/Library/Group Containers/JLMPQHK86H.com.culturedcode.ThingsMac/ThingsData-*/Things Database.thingsdatabase/main.sqlite`
+### Views
+| View | Command | Description |
+|------|---------|-------------|
+| Today | `thingies today` | Tasks scheduled for today |
+| Inbox | `thingies inbox` | Unprocessed tasks (triage queue) |
+| Upcoming | `thingies upcoming` | Future scheduled tasks (shows dates) |
+| Anytime | `thingies anytime` | Available tasks with no specific date |
+| Someday | `thingies someday` | Deferred/backlog tasks |
+| Logbook | `thingies logbook` | Completed tasks |
 
-## CLI Reference
+---
 
-### Global Flags
+## CLI: `thingies`
 
-| Flag | Short | Type | Default | Description |
-|------|-------|------|---------|-------------|
-| `--json` | `-j` | bool | false | Output as JSON |
-| `--db` | `-d` | string | auto-detect | Path to Things database |
-| `--no-color` | | bool | false | Disable colored output |
-| `--verbose` | `-v` | bool | false | Verbose output |
+### Installation
 
-### View Commands
+The source code lives at `~/lrepos/thingies` (same path on all machines).
 
 ```bash
-thingies today                    # Today's tasks
-thingies inbox                    # Inbox (no project, not scheduled)
-thingies upcoming                 # Future scheduled tasks
-thingies someday                  # Deferred to someday
-thingies anytime                  # Available but not scheduled
-thingies logbook                  # Completed tasks (default 50)
-thingies logbook -n 100           # Completed tasks (custom limit)
-thingies snapshot                 # Hierarchical text view
-thingies snapshot --json          # Hierarchical JSON view
-thingies search <query>           # Search by title
-thingies search <query> --in-notes  # Search title and notes
+cd ~/lrepos/thingies
+make build
+ln -sf ~/lrepos/thingies/bin/thingies ~/bin/thingies
 ```
 
-### Task Commands
+If the binary is missing or outdated, rebuild it with `make build`.
+
+### Quick Start
 
 ```bash
-# List
-thingies tasks list
-thingies tasks list --status all              # all|completed|incomplete|canceled
-thingies tasks list --today
-thingies tasks list --area "Work"             # filter by area (name or UUID)
-thingies tasks list --project "Project Name"  # filter by project (name or UUID)
-thingies tasks list --tag "urgent"            # filter by tag
-thingies tasks list --include-future          # include future repeating task instances
+# Orientation - see everything
+thingies snapshot
 
-# Show
+# Today's tasks
+thingies today
+
+# Inbox
+thingies inbox
+
+# Search
+thingies search "keyword"
+```
+
+### Reading Tasks
+
+```bash
+# Views (shortcuts)
+thingies today                              # Today's tasks
+thingies inbox                              # Inbox (unprocessed)
+thingies upcoming                           # Future scheduled tasks (shows dates)
+thingies someday                            # Deferred tasks
+thingies anytime                            # Available but not scheduled
+thingies logbook -n 50                      # Completed tasks (default 50)
+thingies snapshot                           # Hierarchical view of everything
+
+# List with filters
+thingies tasks list                         # All incomplete tasks
+thingies tasks list --today                 # Only Today view
+thingies tasks list --project "Bills"       # Filter by project (name or UUID)
+thingies tasks list --area "Work"           # Filter by area (name or UUID)
+thingies tasks list --tag "urgent"          # Filter by tag
+thingies tasks list --status completed      # Completed tasks
+thingies tasks list --status all            # All statuses
+
+# Show details (accepts name or UUID)
 thingies tasks show <uuid>
+thingies projects show "Want To"            # By name
+thingies projects show <uuid>               # By UUID
+thingies areas show "Work"                  # By name
+thingies areas show <uuid>                  # By UUID
 
-# Create
-thingies tasks create "Title"
-thingies tasks create "Title" --when today
-thingies tasks create "Title" --when tomorrow
-thingies tasks create "Title" --when evening
-thingies tasks create "Title" --when someday
-thingies tasks create "Title" --when 2026-02-15
-thingies tasks create "Title" --deadline 2026-02-15
-thingies tasks create "Title" --tags "a,b,c"
-thingies tasks create "Title" --list "Project Name"
-thingies tasks create "Title" --list "Project" --heading "Section"
-thingies tasks create "Title" --completed     # create as completed
-thingies tasks create "Title" --canceled      # create as canceled
+# Search
+thingies search "keyword"
+thingies search "keyword" --in-notes
 
-# Update (see limitations below)
-thingies tasks update <uuid> --title "New Title"
-thingies tasks update <uuid> --notes "New notes"
-thingies tasks update <uuid> --when tomorrow
-thingies tasks update <uuid> --when today
-thingies tasks update <uuid> --when anytime
-thingies tasks update <uuid> --when someday
-thingies tasks update <uuid> --deadline 2026-02-15
-thingies tasks update <uuid> --tags "tag1,tag2"
+# List entities
+thingies projects list
+thingies areas list
+thingies tags list
 
-# State changes
-thingies tasks complete <uuid>
-thingies tasks cancel <uuid>
-thingies tasks delete <uuid>
-thingies tasks delete <uuid> -f   # skip confirmation
+# JSON output (for scripting)
+thingies --json today
+thingies --json tasks list
 ```
 
-### Project Commands
+### Creating Tasks
 
 ```bash
-thingies projects list
-thingies projects list --include-completed
-thingies projects show <uuid>
-thingies projects show <uuid> --include-completed
-thingies projects create "Title"
-thingies projects create "Title" --area "Work"
-thingies projects create "Title" --todos "Task 1\nTask 2"
-thingies projects update <uuid> --title "New Title"
-thingies projects update <uuid> --notes "New notes"
+# Basic task
+thingies tasks create "Call dentist"
+
+# Task for today
+thingies tasks create "Review PR" --when today
+
+# Task with all options
+thingies tasks create "Quarterly review" \
+  --when today \
+  --deadline 2026-02-01 \
+  --tags "work,finance" \
+  --notes "Focus on Q4 numbers" \
+  --list "Project Name" \
+  --heading "Section"
+
+# Create project
+thingies projects create "New Project" --area "Work"
+```
+
+### Updating Tasks
+
+```bash
+# Update title
+thingies tasks update <uuid> --title "New title"
+
+# Update notes (supports Markdown)
+thingies tasks update <uuid> --notes "# Header\n\nNotes here"
+
+# Reschedule
+thingies tasks update <uuid> --when today
+thingies tasks update <uuid> --when tomorrow
+thingies tasks update <uuid> --when 2026-02-15
+
+# Set deadline
+thingies tasks update <uuid> --deadline 2026-02-01
+
+# Update tags
+thingies tasks update <uuid> --tags "work,urgent"
+
+# Update project
+thingies projects update <uuid> --notes "Project notes with **Markdown**"
+```
+
+### Completing/Deleting Tasks
+
+```bash
+# Complete
+thingies tasks complete <uuid>
 thingies projects complete <uuid>
+
+# Cancel
+thingies tasks cancel <uuid>
+
+# Delete (moves to trash)
+thingies tasks delete <uuid>
+thingies tasks delete <uuid> -f              # Skip confirmation
 thingies projects delete <uuid>
 ```
 
-### Area Commands
+### Common Workflows
+
+**Morning review:**
+```bash
+thingies snapshot                            # See everything
+thingies inbox                               # Check for unprocessed items
+thingies today                               # Focus on today
+```
+
+**Quick add to today:**
+```bash
+thingies tasks create "Quick task" --when today
+```
+
+**Find and complete:**
+```bash
+# Search, get UUID from output, then complete
+thingies search "dentist"
+thingies tasks complete <uuid-from-search>
+```
+
+**Add to Want To project:**
+```bash
+# First find the project UUID
+thingies projects list
+thingies tasks create "Book title" --list "Want To" --heading "Read"
+```
+
+---
+
+## Local REST API Server
+
+The CLI includes a built-in HTTP server for programmatic access:
 
 ```bash
-thingies areas list
-thingies areas show <uuid>
-thingies areas show <uuid> --include-completed
-thingies areas create "Name"
-thingies areas update <uuid> --title "New Name"
-thingies areas delete <uuid>
+thingies serve                    # Start on 0.0.0.0:8484 (default)
+thingies serve -p 3000            # Custom port
+thingies serve --host 127.0.0.1   # Localhost only
 ```
 
-### Tag Commands
+Endpoints mirror the CLI: `/today`, `/inbox`, `/upcoming`, `/tasks`, `/projects`, `/areas`, `/snapshot`, etc.
+
+---
+
+## Remote REST API (Backup)
+
+Use when the CLI is unavailable (e.g., remote access, different machine without the code).
+
+**Base URL:** `${THINGS_API_URL}` (defaults to `https://vega.taildef9.ts.net`)
 
 ```bash
-thingies tags list                          # shows usage counts
-thingies tags create "Name"
-thingies tags create "Name" --parent <uuid>  # nested tag
-thingies tags update <uuid> --title "New"
-thingies tags delete <uuid>
-```
+# Snapshot
+curl -s "${THINGS_API_URL:-https://vega.taildef9.ts.net}/snapshot" | jq -r .snapshot
 
-### Server Command
+# Today
+curl -s "${THINGS_API_URL:-https://vega.taildef9.ts.net}/today" | jq
 
-```bash
-thingies serve                    # 0.0.0.0:8484
-thingies serve -p 3000            # custom port
-thingies serve --host 127.0.0.1   # localhost only
-```
-
-## REST API Reference
-
-Default: `http://localhost:8484`
-
-### Health Check
-
-```
-GET /health
-```
-
-Response:
-```json
-{"status": "ok", "time": "2026-01-31T12:00:00Z"}
-```
-
-### View Endpoints
-
-| Endpoint | Description |
-|----------|-------------|
-| `GET /today` | Today's tasks |
-| `GET /inbox` | Inbox tasks |
-| `GET /upcoming` | Future scheduled tasks |
-| `GET /someday` | Someday tasks |
-| `GET /anytime` | Anytime tasks |
-| `GET /logbook?limit=50` | Completed tasks |
-| `GET /deadlines?days=7` | Tasks with deadlines in next N days |
-| `GET /snapshot` | Hierarchical text snapshot |
-
-All view endpoints return `TaskJSON[]` except `/snapshot` which returns `{"snapshot": "..."}`.
-
-### Task Endpoints
-
-```
-GET    /tasks
-GET    /tasks?status=all|completed|incomplete
-GET    /tasks?today=true
-GET    /tasks?area=<name-or-uuid>
-GET    /tasks?project=<name-or-uuid>
-GET    /tasks?tag=<name>
-GET    /tasks?include-future=true
-GET    /tasks/search?q=<query>&in-notes=true&include-future=true
-GET    /tasks/{uuid}
-POST   /tasks
-PATCH  /tasks/{uuid}
-DELETE /tasks/{uuid}
-POST   /tasks/{uuid}/complete
-POST   /tasks/{uuid}/cancel
-POST   /tasks/{uuid}/move-to-today
-POST   /tasks/{uuid}/move-to-someday
-```
-
-**POST /tasks** (create):
-```json
-{
-  "title": "Task title",
-  "notes": "Optional notes",
-  "when": "today|tomorrow|evening|anytime|someday|YYYY-MM-DD",
-  "deadline": "YYYY-MM-DD",
-  "tags": "tag1,tag2",
-  "list": "Project name",
-  "heading": "Section name"
-}
-```
-
-**PATCH /tasks/{uuid}** (update):
-```json
-{
-  "title": "New title",
-  "notes": "New notes",
-  "when": "today|tomorrow|anytime|someday",
-  "deadline": "2026-02-15",
-  "tags": "new,tags"
-}
-```
-Note: `when` only accepts list names (today/tomorrow/anytime/someday), not specific dates like YYYY-MM-DD. This is an AppleScript limitation.
-
-### Project Endpoints
-
-```
-GET  /projects
-GET  /projects?include-completed=true
-GET  /projects/{uuid}
-GET  /projects/{uuid}/tasks
-GET  /projects/{uuid}/tasks?include-completed=true
-GET  /projects/{uuid}/headings
-POST /projects
-```
-
-**POST /projects**:
-```json
-{
-  "title": "Project title",
-  "notes": "Optional notes",
-  "when": "today|tomorrow|evening|anytime|someday|YYYY-MM-DD",
-  "deadline": "YYYY-MM-DD",
-  "tags": "tag1,tag2",
-  "area": "Area name",
-  "todos": ["Task 1", "Task 2"]
-}
-```
-
-### Area Endpoints
-
-```
-GET /areas
-GET /areas/{uuid}
-GET /areas/{uuid}/tasks
-GET /areas/{uuid}/tasks?include_completed=true
-GET /areas/{uuid}/projects
-GET /areas/{uuid}/projects?include_completed=true
-```
-
-### Tag Endpoints
-
-```
-GET /tags
-GET /tags/{name}/tasks
-```
-
-Tag names are URL-encoded: `/tags/my%20tag/tasks`
-
-### Heading Endpoints
-
-```
-PATCH  /headings/{uuid}
-DELETE /headings/{uuid}
-```
-
-**PATCH /headings/{uuid}**:
-```json
-{
-  "title": "New heading name"
-}
-```
-
-### Response Types
-
-**Success response (write operations):**
-```json
-{"success": true, "message": "task created"}
-```
-
-**Error response (write operations):**
-```json
-{"success": false, "message": "error description"}
-```
-
-**Error response (read operations):**
-```json
-{"error": "error description"}
-```
-
-**TaskJSON:**
-```json
-{
-  "uuid": "ABC123-DEF456-...",
-  "title": "Task title",
-  "notes": "Optional notes",
-  "status": "incomplete|completed|canceled",
-  "type": "Task",
-  "created": "2026-01-31T12:00:00Z",
-  "modified": "2026-01-31T12:00:00Z",
-  "scheduled": "2026-02-01T00:00:00Z",
-  "due": "2026-02-15T00:00:00Z",
-  "completed": "",
-  "area_name": "Work",
-  "project_uuid": "DEF456-...",
-  "project_name": "My Project",
-  "heading_uuid": "",
-  "heading_name": "",
-  "tags": "tag1,tag2",
-  "is_repeating": false,
-  "checklist_items": [
-    {"uuid": "...", "title": "Item", "completed": false, "index": 0}
-  ]
-}
-```
-
-**ProjectJSON:**
-```json
-{
-  "uuid": "ABC123-...",
-  "title": "Project title",
-  "notes": "Optional notes",
-  "status": "incomplete|completed|canceled",
-  "area_name": "Work",
-  "open_tasks": 5,
-  "total_tasks": 8
-}
-```
-
-**Area:**
-```json
-{
-  "uuid": "ABC123-...",
-  "title": "Area name",
-  "open_tasks": 10,
-  "active_projects": 3
-}
-```
-
-**TagJSON:**
-```json
-{
-  "uuid": "ABC123-...",
-  "title": "Tag name",
-  "shortcut": "t",
-  "task_count": 15
-}
-```
-
-**Heading:**
-```json
-{
-  "uuid": "ABC123-...",
-  "title": "Heading name",
-  "index": 0
-}
-```
-
-**ChecklistItem:**
-```json
-{
-  "uuid": "ABC123-...",
-  "title": "Checklist item",
-  "completed": false,
-  "index": 0
-}
-```
-
-## Common Patterns
-
-### Get today's tasks as JSON
-
-CLI:
-```bash
-thingies today --json
-```
-
-API:
-```bash
-curl http://localhost:8484/today
-```
-
-### Create task in project with deadline
-
-CLI:
-```bash
-thingies tasks create "Review PR" --list "Work" --when today --deadline 2026-02-01
-```
-
-API:
-```bash
-curl -X POST http://localhost:8484/tasks \
+# Add task
+curl -s -X POST "${THINGS_API_URL:-https://vega.taildef9.ts.net}/tasks" \
   -H "Content-Type: application/json" \
-  -d '{"title": "Review PR", "list": "Work", "when": "today", "deadline": "2026-02-01"}'
+  -d '{"title": "New task", "when": "today"}' | jq
+
+# Complete task
+curl -s -X POST "${THINGS_API_URL:-https://vega.taildef9.ts.net}/tasks/{uuid}/complete" | jq
 ```
 
-### Complete a task
+See `references/rest-api.md` for complete API documentation.
 
-CLI:
+### API Troubleshooting
+
 ```bash
-thingies tasks complete ABC123-DEF456-...
+# Check if API is responding
+curl -s "${THINGS_API_URL:-https://vega.taildef9.ts.net}/health" | jq
+
+# Restart if needed
+ssh vega 'PATH=/Users/rob/.nvm/versions/node/v22.19.0/bin:$PATH pm2 restart things-api'
 ```
 
-API:
-```bash
-curl -X POST http://localhost:8484/tasks/ABC123-DEF456-.../complete
-```
+---
 
-### Search tasks
+## Resources
 
-CLI:
-```bash
-thingies search "keyword" --in-notes
-```
-
-API:
-```bash
-curl "http://localhost:8484/tasks/search?q=keyword&in-notes=true"
-```
-
-### Get project with all tasks
-
-CLI:
-```bash
-thingies projects show <uuid> --include-completed --json
-```
-
-API:
-```bash
-curl "http://localhost:8484/projects/<uuid>/tasks?include-completed=true"
-```
-
-### Get full snapshot
-
-CLI:
-```bash
-thingies snapshot --json | jq
-```
-
-API:
-```bash
-curl http://localhost:8484/snapshot | jq -r '.snapshot'
-```
-
-### Get tasks with deadlines in next 14 days
-
-API:
-```bash
-curl "http://localhost:8484/deadlines?days=14"
-```
-
-### Move task to Today
-
-CLI:
-```bash
-thingies tasks update <uuid> --when today
-```
-
-API:
-```bash
-curl -X POST http://localhost:8484/tasks/<uuid>/move-to-today
-```
-
-### Move task to Someday
-
-CLI:
-```bash
-thingies tasks update <uuid> --when someday
-```
-
-API:
-```bash
-curl -X POST http://localhost:8484/tasks/<uuid>/move-to-someday
-```
-
-## Gotchas
-
-| Issue | Cause | Solution |
-|-------|-------|----------|
-| Write operations fail | Things 3 not running | Open Things 3 app |
-| Repeating tasks not shown | Filtered by default | Use `--include-future` flag or `include-future=true` query param |
-| Name ambiguous error | Multiple items match name | Use UUID instead |
-| Create returns immediately | URL scheme is async | Task may take a moment to appear |
-| Update activates Things | AppleScript switches focus | Normal behavior |
-| Cannot set specific scheduled date via update | AppleScript limitation | Use `today`, `tomorrow`, `anytime`, or `someday` instead; specific dates only work on create |
-| Evening scheduling via update | AppleScript doesn't expose evening | Maps to Today list |
-
-## Error Codes
-
-| HTTP Status | Meaning |
-|-------------|---------|
-| 200 | Success |
-| 400 | Bad request (missing required field, invalid UUID, invalid request body) |
-| 404 | Resource not found |
-| 500 | Server error (database error, Things integration failure, AppleScript error) |
-
-## Limitations
-
-### AppleScript Update Limitations
-
-The `--when` flag and API `when` field for updates only support:
-- `today` - moves to Today list
-- `tomorrow` - moves to Tomorrow list
-- `anytime` - moves to Anytime list
-- `someday` - moves to Someday list
-- `evening` - maps to Today (AppleScript doesn't expose evening scheduling)
-
-**Specific dates (YYYY-MM-DD) cannot be set via update.** The Things 3 activation date property is read-only in AppleScript. Use the `when` parameter on task creation instead.
-
-### URL Scheme Limitations
-
-- Creates are asynchronous; the task UUID is not returned
-- Spaces must be encoded as `%20`, not `+`
-- Requires Things 3 app to be installed (will launch if not running)
-
-### Database Read-Only
-
-All read operations use direct SQLite access in read-only mode. The database file is owned by Things 3 and should never be modified directly.
+- `references/rest-api.md` - Complete REST API endpoint documentation
