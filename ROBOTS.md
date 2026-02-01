@@ -223,6 +223,20 @@ GET /projects/{uuid}
 GET /projects/{uuid}/tasks
 GET /projects/{uuid}/tasks?include-completed=true
 GET /projects/{uuid}/headings
+POST /projects
+```
+
+**Create project (POST /projects):**
+```json
+{
+  "title": "Project title",
+  "notes": "Optional notes",
+  "when": "today|tomorrow|evening|anytime|someday|YYYY-MM-DD",
+  "deadline": "YYYY-MM-DD",
+  "tags": "tag1,tag2",
+  "area": "Area name",
+  "todos": ["Task 1", "Task 2"]
+}
 ```
 
 #### Areas

@@ -148,7 +148,7 @@ The `serve` command starts an HTTP server (default port 8484). Key endpoints:
 - `GET /today`, `/inbox`, `/upcoming`, `/someday`, `/anytime`, `/logbook`, `/deadlines` - Views
 - `GET /tasks`, `POST /tasks`, `GET /tasks/{uuid}`, `PATCH /tasks/{uuid}`, `DELETE /tasks/{uuid}`
 - `POST /tasks/{uuid}/complete`, `/cancel`, `/move-to-today`, `/move-to-someday`
-- `GET /projects`, `GET /projects/{uuid}`, `GET /projects/{uuid}/tasks`, `GET /projects/{uuid}/headings`
+- `GET /projects`, `POST /projects`, `GET /projects/{uuid}`, `GET /projects/{uuid}/tasks`, `GET /projects/{uuid}/headings`
 - `GET /areas`, `GET /areas/{uuid}`, `GET /areas/{uuid}/tasks`, `GET /areas/{uuid}/projects`
 - `GET /tags`, `GET /tags/{name}/tasks`
 - `GET /snapshot` - Full hierarchical view as JSON
