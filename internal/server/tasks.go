@@ -27,6 +27,17 @@ type TaskUpdateRequest struct {
 	Tags     string `json:"tags,omitempty"`
 }
 
+// ProjectCreateRequest is the request body for creating a project
+type ProjectCreateRequest struct {
+	Title    string   `json:"title"`
+	Notes    string   `json:"notes,omitempty"`
+	When     string   `json:"when,omitempty"`
+	Deadline string   `json:"deadline,omitempty"`
+	Tags     string   `json:"tags,omitempty"`
+	Area     string   `json:"area,omitempty"`
+	ToDos    []string `json:"todos,omitempty"`
+}
+
 // APIResponse is a standard API response
 type APIResponse struct {
 	Success bool   `json:"success"`
@@ -197,4 +208,36 @@ func (s *Server) handleMoveTaskToSomeday(w http.ResponseWriter, r *http.Request)
 	}
 
 	writeSuccess(w, "task moved to someday")
+}
+
+// handleCreateProject handles POST /projects
+func (s *Server) handleCreateProject(w http.ResponseWriter, r *http.Request) {
+	var req ProjectCreateRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body: "+err.Error())
+		return
+	}
+
+	if req.Title == "" {
+		writeError(w, http.StatusBadRequest, "title is required")
+		return
+	}
+
+	params := things.AddProjectParams{
+		Title:    req.Title,
+		Notes:    req.Notes,
+		When:     req.When,
+		Deadline: req.Deadline,
+		Tags:     req.Tags,
+		Area:     req.Area,
+		ToDos:    req.ToDos,
+	}
+
+	url := things.BuildAddProjectURL(params)
+	if err := things.OpenURL(url); err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to create project: "+err.Error())
+		return
+	}
+
+	writeSuccess(w, "project created")
 }

@@ -80,6 +80,7 @@ func (s *Server) registerRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /projects/{uuid}", s.handleGetProject)
 	mux.HandleFunc("GET /projects/{uuid}/tasks", s.handleGetProjectTasks)
 	mux.HandleFunc("GET /projects/{uuid}/headings", s.handleGetProjectHeadings)
+	mux.HandleFunc("POST /projects", s.handleCreateProject)
 
 	// Area routes
 	mux.HandleFunc("GET /areas", s.handleListAreas)
