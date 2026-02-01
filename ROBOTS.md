@@ -60,11 +60,12 @@ thingies search <query> --in-notes  # Search title and notes
 ```bash
 # List
 thingies tasks list
-thingies tasks list --status all              # all|completed|incomplete
+thingies tasks list --status all              # all|completed|incomplete|canceled
 thingies tasks list --today
 thingies tasks list --area "Work"             # filter by area (name or UUID)
 thingies tasks list --project "Project Name"  # filter by project (name or UUID)
 thingies tasks list --tag "urgent"            # filter by tag
+thingies tasks list --include-future          # include future repeating task instances
 
 # Show
 thingies tasks show <uuid>
@@ -80,12 +81,18 @@ thingies tasks create "Title" --deadline 2026-02-15
 thingies tasks create "Title" --tags "a,b,c"
 thingies tasks create "Title" --list "Project Name"
 thingies tasks create "Title" --list "Project" --heading "Section"
+thingies tasks create "Title" --completed     # create as completed
+thingies tasks create "Title" --canceled      # create as canceled
 
-# Update
+# Update (see limitations below)
 thingies tasks update <uuid> --title "New Title"
 thingies tasks update <uuid> --notes "New notes"
 thingies tasks update <uuid> --when tomorrow
+thingies tasks update <uuid> --when today
+thingies tasks update <uuid> --when anytime
+thingies tasks update <uuid> --when someday
 thingies tasks update <uuid> --deadline 2026-02-15
+thingies tasks update <uuid> --tags "tag1,tag2"
 
 # State changes
 thingies tasks complete <uuid>
@@ -164,7 +171,7 @@ Response:
 | `GET /someday` | Someday tasks |
 | `GET /anytime` | Anytime tasks |
 | `GET /logbook?limit=50` | Completed tasks |
-| `GET /deadlines?days=7` | Tasks with deadlines |
+| `GET /deadlines?days=7` | Tasks with deadlines in next N days |
 | `GET /snapshot` | Hierarchical text snapshot |
 
 All view endpoints return `TaskJSON[]` except `/snapshot` which returns `{"snapshot": "..."}`.
@@ -179,7 +186,7 @@ GET    /tasks?area=<name-or-uuid>
 GET    /tasks?project=<name-or-uuid>
 GET    /tasks?tag=<name>
 GET    /tasks?include-future=true
-GET    /tasks/search?q=<query>&in-notes=true
+GET    /tasks/search?q=<query>&in-notes=true&include-future=true
 GET    /tasks/{uuid}
 POST   /tasks
 PATCH  /tasks/{uuid}
@@ -208,11 +215,12 @@ POST   /tasks/{uuid}/move-to-someday
 {
   "title": "New title",
   "notes": "New notes",
-  "when": "tomorrow",
+  "when": "today|tomorrow|anytime|someday",
   "deadline": "2026-02-15",
   "tags": "new,tags"
 }
 ```
+Note: `when` only accepts list names (today/tomorrow/anytime/someday), not specific dates like YYYY-MM-DD. This is an AppleScript limitation.
 
 ### Project Endpoints
 
@@ -266,19 +274,26 @@ PATCH  /headings/{uuid}
 DELETE /headings/{uuid}
 ```
 
+**PATCH /headings/{uuid}**:
+```json
+{
+  "title": "New heading name"
+}
+```
+
 ### Response Types
 
-**Success response:**
+**Success response (write operations):**
 ```json
 {"success": true, "message": "task created"}
 ```
 
-**Error response:**
+**Error response (write operations):**
 ```json
 {"success": false, "message": "error description"}
 ```
 
-Or for read errors:
+**Error response (read operations):**
 ```json
 {"error": "error description"}
 ```
@@ -290,7 +305,7 @@ Or for read errors:
   "title": "Task title",
   "notes": "Optional notes",
   "status": "incomplete|completed|canceled",
-  "type": "task|project|heading",
+  "type": "Task",
   "created": "2026-01-31T12:00:00Z",
   "modified": "2026-01-31T12:00:00Z",
   "scheduled": "2026-02-01T00:00:00Z",
@@ -306,6 +321,58 @@ Or for read errors:
   "checklist_items": [
     {"uuid": "...", "title": "Item", "completed": false, "index": 0}
   ]
+}
+```
+
+**ProjectJSON:**
+```json
+{
+  "uuid": "ABC123-...",
+  "title": "Project title",
+  "notes": "Optional notes",
+  "status": "incomplete|completed|canceled",
+  "area_name": "Work",
+  "open_tasks": 5,
+  "total_tasks": 8
+}
+```
+
+**Area:**
+```json
+{
+  "uuid": "ABC123-...",
+  "title": "Area name",
+  "open_tasks": 10,
+  "active_projects": 3
+}
+```
+
+**TagJSON:**
+```json
+{
+  "uuid": "ABC123-...",
+  "title": "Tag name",
+  "shortcut": "t",
+  "task_count": 15
+}
+```
+
+**Heading:**
+```json
+{
+  "uuid": "ABC123-...",
+  "title": "Heading name",
+  "index": 0
+}
+```
+
+**ChecklistItem:**
+```json
+{
+  "uuid": "ABC123-...",
+  "title": "Checklist item",
+  "completed": false,
+  "index": 0
 }
 ```
 
@@ -385,6 +452,37 @@ API:
 curl http://localhost:8484/snapshot | jq -r '.snapshot'
 ```
 
+### Get tasks with deadlines in next 14 days
+
+API:
+```bash
+curl "http://localhost:8484/deadlines?days=14"
+```
+
+### Move task to Today
+
+CLI:
+```bash
+thingies tasks update <uuid> --when today
+```
+
+API:
+```bash
+curl -X POST http://localhost:8484/tasks/<uuid>/move-to-today
+```
+
+### Move task to Someday
+
+CLI:
+```bash
+thingies tasks update <uuid> --when someday
+```
+
+API:
+```bash
+curl -X POST http://localhost:8484/tasks/<uuid>/move-to-someday
+```
+
 ## Gotchas
 
 | Issue | Cause | Solution |
@@ -394,12 +492,37 @@ curl http://localhost:8484/snapshot | jq -r '.snapshot'
 | Name ambiguous error | Multiple items match name | Use UUID instead |
 | Create returns immediately | URL scheme is async | Task may take a moment to appear |
 | Update activates Things | AppleScript switches focus | Normal behavior |
+| Cannot set specific scheduled date via update | AppleScript limitation | Use `today`, `tomorrow`, `anytime`, or `someday` instead; specific dates only work on create |
+| Evening scheduling via update | AppleScript doesn't expose evening | Maps to Today list |
 
 ## Error Codes
 
 | HTTP Status | Meaning |
 |-------------|---------|
 | 200 | Success |
-| 400 | Bad request (missing required field, invalid UUID) |
+| 400 | Bad request (missing required field, invalid UUID, invalid request body) |
 | 404 | Resource not found |
-| 500 | Server error (database error, Things integration failure) |
+| 500 | Server error (database error, Things integration failure, AppleScript error) |
+
+## Limitations
+
+### AppleScript Update Limitations
+
+The `--when` flag and API `when` field for updates only support:
+- `today` - moves to Today list
+- `tomorrow` - moves to Tomorrow list
+- `anytime` - moves to Anytime list
+- `someday` - moves to Someday list
+- `evening` - maps to Today (AppleScript doesn't expose evening scheduling)
+
+**Specific dates (YYYY-MM-DD) cannot be set via update.** The Things 3 activation date property is read-only in AppleScript. Use the `when` parameter on task creation instead.
+
+### URL Scheme Limitations
+
+- Creates are asynchronous; the task UUID is not returned
+- Spaces must be encoded as `%20`, not `+`
+- Requires Things 3 app to be installed (will launch if not running)
+
+### Database Read-Only
+
+All read operations use direct SQLite access in read-only mode. The database file is owned by Things 3 and should never be modified directly.

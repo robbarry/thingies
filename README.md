@@ -52,8 +52,10 @@ thingies tasks list --project "Bills" --tag "urgent"   # Filter by project and t
 thingies tasks show <uuid>                             # Full task details
 thingies tasks create "New task"                       # Create task
 thingies tasks create "New task" --when today --list "Project" --heading "Section"
+thingies tasks create "New task" --deadline 2026-02-15 # With due date
 
 thingies tasks update <uuid> --title "New" --notes "Updated" --when tomorrow
+thingies tasks update <uuid> --deadline 2026-02-15     # Set due date
 thingies tasks complete <uuid>
 thingies tasks cancel <uuid>
 thingies tasks delete <uuid>
@@ -65,7 +67,9 @@ thingies tasks delete <uuid>
 thingies projects list
 thingies projects show <uuid>
 thingies projects create "New project" --area "Work" --todos "Task 1\nTask 2"
+thingies projects create "New project" --deadline 2026-03-01  # With due date
 thingies projects update <uuid> --notes "# Markdown supported"
+thingies projects update <uuid> --deadline 2026-03-01
 thingies projects complete <uuid>
 thingies projects delete <uuid>
 ```
@@ -119,6 +123,7 @@ thingies serve --host 127.0.0.1  # Localhost only
 
 **Tasks:**
 - `GET /tasks` - List tasks
+- `GET /tasks/search?q=query` - Search tasks
 - `POST /tasks` - Create task
 - `GET /tasks/{uuid}` - Get task
 - `PATCH /tasks/{uuid}` - Update task
@@ -141,6 +146,10 @@ thingies serve --host 127.0.0.1  # Localhost only
 **Tags:**
 - `GET /tags` - List tags
 - `GET /tags/{name}/tasks` - Get tasks by tag
+
+**Headings:**
+- `PATCH /headings/{uuid}` - Update heading
+- `DELETE /headings/{uuid}` - Delete heading
 
 **Health:**
 - `GET /health` - Health check

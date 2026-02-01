@@ -125,9 +125,12 @@ Most commands accept either a UUID or a name for areas/projects. Names are resol
 - `TMArea` (visible: NULL means visible)
 - `TMTag`, `TMTaskTag` (many-to-many)
 
-**Date epochs:**
-- `creationDate`, `userModificationDate`, `stopDate`: Unix epoch (1970)
-- `startDate`, `deadline`: Things epoch (2021-11-11 00:00:00 UTC) - constant `thingsDateEpoch = 1636588800` in `scanner.go`
+**Date formats:**
+- `creationDate`, `userModificationDate`, `stopDate`: Unix timestamps (seconds since 1970)
+- `startDate`, `deadline`: Binary-packed dates (NOT timestamps)
+  - Format: `year << 16 | month << 12 | day << 7`
+  - Example: 2026-01-31 = `(2026 << 16) | (1 << 12) | (31 << 7)` = `132775936`
+  - See `DateToPackedInt()` in `db.go` and `thingsDateToNullTime()` in `scanner.go`
 
 ### Things Integration
 
@@ -149,21 +152,45 @@ AppleScript can update notes without an auth token (unlike URL scheme).
 
 ### REST API Endpoints
 
-The `serve` command starts an HTTP server (default port 8484). Key endpoints:
-- `GET /health` - Health check
-- `GET /today`, `/inbox`, `/upcoming`, `/someday`, `/anytime`, `/logbook`, `/deadlines` - Views
-- `GET /tasks`, `POST /tasks`, `GET /tasks/{uuid}`, `PATCH /tasks/{uuid}`, `DELETE /tasks/{uuid}`
-- `POST /tasks/{uuid}/complete`, `/cancel`, `/move-to-today`, `/move-to-someday`
-- `GET /projects`, `POST /projects`, `GET /projects/{uuid}`, `GET /projects/{uuid}/tasks`, `GET /projects/{uuid}/headings`
-- `GET /areas`, `GET /areas/{uuid}`, `GET /areas/{uuid}/tasks`, `GET /areas/{uuid}/projects`
-- `GET /tags`, `GET /tags/{name}/tasks`
+The `serve` command starts an HTTP server (default port 8484). All responses are JSON.
+
+**Views:**
+- `GET /today`, `/inbox`, `/upcoming`, `/someday`, `/anytime`, `/logbook`, `/deadlines`
 - `GET /snapshot` - Full hierarchical view as JSON
+
+**Tasks:**
+- `GET /tasks` - List tasks (query params: `status`, `area`, `project`, `tag`, `today`, `include-future`)
+- `GET /tasks/search?q=term` - Search (query params: `in-notes`, `include-future`)
+- `GET /tasks/{uuid}`, `POST /tasks`, `PATCH /tasks/{uuid}`, `DELETE /tasks/{uuid}`
+- `POST /tasks/{uuid}/complete`, `/cancel`, `/move-to-today`, `/move-to-someday`
+
+**Projects:**
+- `GET /projects` - List (query param: `include-completed`)
+- `POST /projects`, `GET /projects/{uuid}`
+- `GET /projects/{uuid}/tasks`, `GET /projects/{uuid}/headings`
+
+**Areas:**
+- `GET /areas`, `GET /areas/{uuid}`
+- `GET /areas/{uuid}/tasks`, `GET /areas/{uuid}/projects` (query param: `include_completed`)
+
+**Tags:**
+- `GET /tags`, `GET /tags/{name}/tasks`
+
+**Headings:**
+- `PATCH /headings/{uuid}`, `DELETE /headings/{uuid}`
+
+**Health:**
+- `GET /health`
 
 ## Gotchas
 
 - **Area visibility**: `visible = NULL` means visible (not `visible = 1`)
-- **Today view logic**: Tasks appear in Today if `start=1` with startDate set, OR `start=2` with startDate <= today, OR deadline <= today (not suppressed)
-- **Repeating tasks**: `rt1_repeatingTemplate IS NOT NULL`; filtered by default, use `--include-future`
+- **Today view logic**: Tasks appear in Today if:
+  - `start=1` AND `startDate` is set (Anytime tasks moved to Today), OR
+  - `start=2` AND `startDate <= today` (Someday tasks with past/current start date), OR
+  - `deadline <= today` AND `deadlineSuppressionDate IS NULL` (overdue by deadline)
+- **Repeating tasks**: `rt1_repeatingTemplate IS NOT NULL`; future instances filtered by default, use `--include-future`
+- **Start field values**: `0` = Inbox, `1` = Anytime, `2` = Someday (scheduled or deferred)
 - **No CGO**: Uses `modernc.org/sqlite` pure Go driver (no C compiler needed)
 - **Shell completions**: `thingies completion bash/zsh/fish`
-- **Go version**: Requires Go 1.21+ (see go.mod)
+- **Go version**: Requires Go 1.21+ (current: 1.25.5 per go.mod)
