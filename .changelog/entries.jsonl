@@ -1,0 +1,35 @@
+{"date": "2026-01-31", "category": "Added", "description": "POST /projects endpoint for creating projects via REST API", "commits": ["684cbbf"]}
+{"date": "2026-01-31", "category": "Fixed", "description": "Repeating tasks now correctly appear in upcoming/someday views", "commits": ["f2e5502"]}
+{"date": "2026-01-31", "category": "Changed", "description": "Default HTTP server port changed to 8484", "commits": ["4655d0b"]}
+{"date": "2026-01-30", "category": "Added", "description": "REST API server with `thingies serve` command", "commits": ["dc5d2b8"]}
+{"date": "2026-01-30", "category": "Added", "description": "View endpoints: GET /today, /inbox, /upcoming, /someday, /anytime, /logbook, /deadlines", "commits": ["a072203"]}
+{"date": "2026-01-30", "category": "Added", "description": "Task CRUD endpoints: GET/POST/PATCH/DELETE /tasks and action endpoints (complete, cancel, move-to-today)", "commits": ["f81c497", "ce66689"]}
+{"date": "2026-01-30", "category": "Added", "description": "Project read endpoints: GET /projects, GET /projects/{uuid}", "commits": ["46f59e3", "3633fd8"]}
+{"date": "2026-01-30", "category": "Added", "description": "Heading write endpoints for project sections", "commits": ["1344999"]}
+{"date": "2026-01-30", "category": "Added", "description": "Area and tag read endpoints: GET /areas, GET /tags", "commits": ["6d1d23b"]}
+{"date": "2026-01-30", "category": "Added", "description": "Snapshot endpoint: GET /snapshot for full Things state", "commits": ["26d96f8"]}
+{"date": "2026-01-30", "category": "Added", "description": "Checklist item support in task queries", "commits": ["6e29757"]}
+{"date": "2026-01-30", "category": "Added", "description": "Name/UUID resolution utilities for projects and areas", "commits": ["e48123c"]}
+{"date": "2026-01-30", "category": "Added", "description": "AppleScript functions for task move and heading operations", "commits": ["22fb77f", "c1fbbcf"]}
+{"date": "2026-01-30", "category": "Added", "description": "CancelProject AppleScript function", "commits": ["5f84d2b"]}
+{"date": "2026-01-30", "category": "Added", "description": "`anytime` command showing tasks with start=1", "commits": ["bd911a0"]}
+{"date": "2026-01-30", "category": "Added", "description": "`logbook` command for viewing completed tasks with completion dates", "commits": ["de95515", "7411ad0"]}
+{"date": "2026-01-30", "category": "Added", "description": "Project/heading UUIDs shown in task details view", "commits": ["818d5ca"]}
+{"date": "2026-01-30", "category": "Added", "description": "Create/update/delete commands for areas and tags", "commits": ["a90de99"]}
+{"date": "2026-01-30", "category": "Added", "description": "`upcoming` and `someday` view commands", "commits": ["d48839a"]}
+{"date": "2026-01-30", "category": "Added", "description": "Heading support in task hierarchy display", "commits": ["a770522", "acb378e"]}
+{"date": "2026-01-30", "category": "Fixed", "description": "Route registration for all endpoints after merge conflicts", "commits": ["f1449c2", "68f8154"]}
+{"date": "2026-01-30", "category": "Fixed", "description": "Duplicate writeJSON/writeError methods in headings.go", "commits": ["5880db2"]}
+{"date": "2026-01-30", "category": "Fixed", "description": "Anytime view now includes scheduled someday tasks that are available", "commits": ["d656fd5"]}
+{"date": "2026-01-30", "category": "Fixed", "description": "Tasks from trashed projects are now properly filtered out", "commits": ["da3b0c9", "f49a557"]}
+{"date": "2026-01-30", "category": "Fixed", "description": "Snapshot now includes IDs, upcoming/someday sections, and 'all' alias", "commits": ["dfbc139"]}
+{"date": "2026-01-30", "category": "Fixed", "description": "Inbox query now uses start=0 matching Things behavior", "commits": ["ad1d9eb"]}
+{"date": "2026-01-30", "category": "Changed", "description": "Short UUIDs now supported in `tasks show`", "commits": ["26e294d"]}
+{"date": "2026-01-30", "category": "Changed", "description": "Task list now shows only due dates, scheduled dates removed", "commits": ["300f3c7"]}
+{"date": "2026-01-30", "category": "Changed", "description": "Deadlines prefixed with 'due' in task output", "commits": ["f9cd38e"]}
+{"date": "2026-01-27", "category": "Fixed", "description": "Binary-packed date decoding in scanner.go", "commits": ["d352de3"]}
+{"date": "2026-01-27", "category": "Fixed", "description": "Task update --when now uses move to list correctly", "commits": ["2309e3a"]}
+{"date": "2026-01-27", "category": "Fixed", "description": "Today query output format and added IDs", "commits": ["4bf78ec"]}
+{"date": "2026-01-25", "category": "Added", "description": "Go CLI rewrite with SQLite reads, URL scheme creates, AppleScript updates", "commits": ["da0bd6b"]}
+{"date": "2025-05-31", "category": "Added", "description": "Initial project structure and configuration", "commits": ["2be786d"]}
+{"date": "2025-05-31", "category": "Fixed", "description": "Tasks from trashed projects excluded from views", "commits": ["082e52c", "1b90e25", "889d74a"]}

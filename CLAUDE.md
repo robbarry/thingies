@@ -16,9 +16,15 @@ Thingies is a Go CLI tool and REST API server that provides full CRUD access to 
 ```bash
 make build              # Build to bin/thingies
 make install            # Install to /usr/local/bin
-make test               # Run tests
-make fmt                # Format code
+make test               # Run tests (go test ./...)
+make fmt                # Format code (go fmt ./...)
 make tidy               # go mod tidy
+make run ARGS="today"   # Build and run with args
+```
+
+Run a single test:
+```bash
+go test ./internal/db -run TestFunctionName -v
 ```
 
 ### Commands Reference
@@ -156,7 +162,8 @@ The `serve` command starts an HTTP server (default port 8484). Key endpoints:
 ## Gotchas
 
 - **Area visibility**: `visible = NULL` means visible (not `visible = 1`)
-- **Today view**: Tasks in Today have `todayIndex > 0`
+- **Today view logic**: Tasks appear in Today if `start=1` with startDate set, OR `start=2` with startDate <= today, OR deadline <= today (not suppressed)
 - **Repeating tasks**: `rt1_repeatingTemplate IS NOT NULL`; filtered by default, use `--include-future`
-- **No CGO**: Uses `modernc.org/sqlite` pure Go driver
+- **No CGO**: Uses `modernc.org/sqlite` pure Go driver (no C compiler needed)
 - **Shell completions**: `thingies completion bash/zsh/fish`
+- **Go version**: Requires Go 1.21+ (see go.mod)

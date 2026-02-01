@@ -2,86 +2,171 @@
 
 A Go CLI and REST API for Things 3 with full CRUD access.
 
+## Requirements
+
+- macOS with Things 3 installed
+- Go 1.21+ (for building)
+
 ## Install
 
 ```bash
 make install  # builds and copies to /usr/local/bin
 ```
 
-## CLI Usage
+Or build without installing:
 
 ```bash
-# Views
-thingies today
-thingies inbox
-thingies upcoming
-thingies someday
-thingies anytime
-thingies logbook -n 50
-thingies snapshot
+make build    # outputs to bin/thingies
+```
 
-# Search
+## CLI Usage
+
+### Views
+
+```bash
+thingies today              # Today's tasks
+thingies inbox              # Inbox (no area/project, not scheduled)
+thingies upcoming           # Future scheduled tasks
+thingies someday            # Tasks deferred to someday
+thingies anytime            # Available but not scheduled
+thingies logbook -n 50      # Completed tasks (default 50)
+thingies snapshot           # Hierarchical view (areas -> projects -> tasks)
+```
+
+### Search
+
+```bash
 thingies search "keyword"
-thingies search "keyword" --in-notes
+thingies search "keyword" --in-notes  # Also search notes
+```
 
-# Tasks
-thingies tasks list
-thingies tasks list --today --area "Work" --project "Bills" --tag "urgent"
-thingies tasks show <uuid>
+### Tasks
+
+```bash
+thingies tasks list                                    # All incomplete tasks
+thingies tasks list --status all                       # Include completed/canceled
+thingies tasks list --today                            # Only Today view
+thingies tasks list --area "Work"                      # Filter by area
+thingies tasks list --project "Bills" --tag "urgent"   # Filter by project and tag
+
+thingies tasks show <uuid>                             # Full task details
+thingies tasks create "New task"                       # Create task
 thingies tasks create "New task" --when today --list "Project" --heading "Section"
+
 thingies tasks update <uuid> --title "New" --notes "Updated" --when tomorrow
 thingies tasks complete <uuid>
 thingies tasks cancel <uuid>
 thingies tasks delete <uuid>
+```
 
-# Projects
+### Projects
+
+```bash
 thingies projects list
 thingies projects show <uuid>
 thingies projects create "New project" --area "Work" --todos "Task 1\nTask 2"
 thingies projects update <uuid> --notes "# Markdown supported"
 thingies projects complete <uuid>
 thingies projects delete <uuid>
+```
 
-# Areas
+### Areas
+
+```bash
 thingies areas list
 thingies areas show <uuid>
 thingies areas create "Name"
 thingies areas update <uuid> --title "New name"
 thingies areas delete <uuid>
+```
 
-# Tags
+### Tags
+
+```bash
 thingies tags list
 thingies tags create "Name"
 thingies tags create "Nested" --parent <uuid>
 thingies tags update <uuid> --title "New name"
 thingies tags delete <uuid>
-
-# JSON output
-thingies --json today
-thingies --json tasks list
 ```
+
+### Global Flags
+
+```
+--db, -d     Path to Things database (default: auto-detect)
+--json, -j   Output as JSON
+--no-color   Disable colors
+--verbose    Verbose output
+```
+
+### Name Resolution
+
+Most commands accept either a UUID or a name for areas/projects. Names are resolved to UUIDs automatically; if multiple items share a name, you'll be prompted to use the UUID.
 
 ## REST API
 
 ```bash
-thingies serve              # 0.0.0.0:8484
-thingies serve -p 3000      # custom port
+thingies serve              # Start on 0.0.0.0:8484
+thingies serve -p 3000      # Custom port
+thingies serve --host 127.0.0.1  # Localhost only
 ```
 
-Key endpoints:
-- `GET /today`, `/inbox`, `/upcoming`, `/someday`, `/anytime`, `/logbook`
-- `GET /tasks`, `POST /tasks`, `GET /tasks/{uuid}`, `PATCH /tasks/{uuid}`, `DELETE /tasks/{uuid}`
-- `POST /tasks/{uuid}/complete`, `/cancel`, `/move-to-today`
-- `GET /projects`, `/areas`, `/tags`
-- `GET /snapshot`
+### Endpoints
+
+**Views:**
+- `GET /today`, `/inbox`, `/upcoming`, `/someday`, `/anytime`, `/logbook`, `/deadlines`
+- `GET /snapshot` - Full hierarchical view as JSON
+
+**Tasks:**
+- `GET /tasks` - List tasks
+- `POST /tasks` - Create task
+- `GET /tasks/{uuid}` - Get task
+- `PATCH /tasks/{uuid}` - Update task
+- `DELETE /tasks/{uuid}` - Delete task
+- `POST /tasks/{uuid}/complete`, `/cancel`, `/move-to-today`, `/move-to-someday`
+
+**Projects:**
+- `GET /projects` - List projects
+- `POST /projects` - Create project
+- `GET /projects/{uuid}` - Get project
+- `GET /projects/{uuid}/tasks` - Get project tasks
+- `GET /projects/{uuid}/headings` - Get project headings
+
+**Areas:**
+- `GET /areas` - List areas
+- `GET /areas/{uuid}` - Get area
+- `GET /areas/{uuid}/tasks` - Get area tasks
+- `GET /areas/{uuid}/projects` - Get area projects
+
+**Tags:**
+- `GET /tags` - List tags
+- `GET /tags/{name}/tasks` - Get tasks by tag
+
+**Health:**
+- `GET /health` - Health check
 
 ## How It Works
 
-- **Reads**: Direct SQLite access (fast, no app launch)
-- **Creates**: Things URL scheme (`things:///add`)
-- **Updates/Deletes**: AppleScript via `osascript`
+- **Reads**: Direct SQLite access (fast, no app launch needed)
+- **Creates**: Things URL scheme (`things:///add`, `things:///add-project`)
+- **Updates/Deletes/Completes**: AppleScript via `osascript`
 
-## Requirements
+The database is accessed read-only using a pure Go SQLite driver (no CGO required).
 
-- macOS with Things 3 installed
-- Go 1.21+ (for building)
+## Shell Completions
+
+```bash
+thingies completion bash > /etc/bash_completion.d/thingies
+thingies completion zsh > "${fpath[1]}/_thingies"
+thingies completion fish > ~/.config/fish/completions/thingies.fish
+```
+
+## Development
+
+```bash
+make build    # Build to bin/thingies
+make install  # Install to /usr/local/bin
+make test     # Run tests
+make fmt      # Format code
+make tidy     # go mod tidy
+```
