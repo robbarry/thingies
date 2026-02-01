@@ -9,7 +9,7 @@ import (
 var showIncludeCompleted bool
 
 var showCmd = &cobra.Command{
-	Use:   "show <uuid>",
+	Use:   "show <name-or-uuid>",
 	Short: "Show project details",
 	Long:  `Show detailed information about a specific project including its tasks.`,
 	Args:  cobra.ExactArgs(1),
@@ -27,12 +27,18 @@ func runShow(cmd *cobra.Command, args []string) error {
 	}
 	defer thingsDB.Close()
 
-	project, err := thingsDB.GetProject(args[0])
+	// Resolve name to UUID if needed
+	uuid, err := thingsDB.ResolveProjectID(args[0])
 	if err != nil {
 		return err
 	}
 
-	tasks, err := thingsDB.GetProjectTasks(args[0], showIncludeCompleted)
+	project, err := thingsDB.GetProject(uuid)
+	if err != nil {
+		return err
+	}
+
+	tasks, err := thingsDB.GetProjectTasks(uuid, showIncludeCompleted)
 	if err != nil {
 		return err
 	}
