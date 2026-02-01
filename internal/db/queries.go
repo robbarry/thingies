@@ -725,9 +725,64 @@ func (db *ThingsDB) GetTasksByTag(tagName string) ([]models.Task, error) {
 	return scanTasks(rows)
 }
 
-// GetUpcomingTasks returns tasks scheduled for the future (start=2/Someday with future startDate)
+// GetUpcomingTasks returns tasks scheduled for the future (start=2/Someday with future startDate or rt1_nextInstanceStartDate)
 func (db *ThingsDB) GetUpcomingTasks() ([]models.Task, error) {
 	todayPacked := TodayPackedDate()
+	query := fmt.Sprintf(`
+		SELECT
+			t.uuid,
+			t.title,
+			t.notes,
+			t.status,
+			t.type,
+			t.creationDate,
+			t.userModificationDate,
+			COALESCE(t.startDate, t.rt1_nextInstanceStartDate) as startDate,
+			t.deadline,
+			t.stopDate,
+			COALESCE(a.title, pa.title, hpa.title) as area_name,
+			COALESCE(p.uuid, hp.uuid) as project_uuid,
+			COALESCE(p.title, hp.title) as project_name,
+			h.uuid as heading_uuid,
+			h.title as heading_name,
+			GROUP_CONCAT(tag.title, ', ') as tags,
+			CASE WHEN t.rt1_repeatingTemplate IS NOT NULL THEN 1 ELSE 0 END as is_repeating,
+			t.todayIndex
+		FROM TMTask t
+		LEFT JOIN TMArea a ON t.area = a.uuid
+		LEFT JOIN TMTask p ON t.project = p.uuid AND p.type = 1
+		LEFT JOIN TMArea pa ON p.area = pa.uuid
+		LEFT JOIN TMTask h ON t.heading = h.uuid
+		LEFT JOIN TMTask hp ON h.project = hp.uuid AND hp.type = 1
+		LEFT JOIN TMArea hpa ON hp.area = hpa.uuid
+		LEFT JOIN TMTaskTag tt ON t.uuid = tt.tasks
+		LEFT JOIN TMTag tag ON tt.tags = tag.uuid
+		WHERE t.type = 0 AND t.trashed = 0 AND t.status = 0
+			AND t.start = 2
+			AND (
+				(t.startDate IS NOT NULL AND t.startDate > %d)
+				OR (t.startDate IS NULL AND t.rt1_nextInstanceStartDate IS NOT NULL AND t.rt1_nextInstanceStartDate > %d)
+			)
+			AND (t.project IS NULL OR p.trashed = 0)
+			AND (hp.trashed IS NULL OR hp.trashed = 0)
+		GROUP BY t.uuid
+		ORDER BY COALESCE(t.startDate, t.rt1_nextInstanceStartDate), t."index"
+	`, todayPacked, todayPacked)
+
+	rows, err := db.conn.Query(query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query upcoming tasks: %w", err)
+	}
+	defer rows.Close()
+
+	return scanTasks(rows)
+}
+
+// GetSomedayTasks returns someday tasks (start=2/Someday with no scheduled date)
+// Excludes tasks with rt1_nextInstanceStartDate that indicates a real future date (year >= 2020)
+func (db *ThingsDB) GetSomedayTasks() ([]models.Task, error) {
+	// Packed date threshold: 2020-01-01 = 2020 << 16 | 1 << 12 | 1 << 7 = 132382848
+	minRealDate := 132382848
 	query := fmt.Sprintf(`
 		SELECT
 			t.uuid,
@@ -759,61 +814,13 @@ func (db *ThingsDB) GetUpcomingTasks() ([]models.Task, error) {
 		LEFT JOIN TMTag tag ON tt.tags = tag.uuid
 		WHERE t.type = 0 AND t.trashed = 0 AND t.status = 0
 			AND t.start = 2
-			AND t.startDate IS NOT NULL AND t.startDate > %d
-			AND (t.project IS NULL OR p.trashed = 0)
-			AND (hp.trashed IS NULL OR hp.trashed = 0)
-		GROUP BY t.uuid
-		ORDER BY t.startDate, t."index"
-	`, todayPacked)
-
-	rows, err := db.conn.Query(query)
-	if err != nil {
-		return nil, fmt.Errorf("failed to query upcoming tasks: %w", err)
-	}
-	defer rows.Close()
-
-	return scanTasks(rows)
-}
-
-// GetSomedayTasks returns someday tasks (start=2/Someday with no startDate)
-func (db *ThingsDB) GetSomedayTasks() ([]models.Task, error) {
-	query := `
-		SELECT
-			t.uuid,
-			t.title,
-			t.notes,
-			t.status,
-			t.type,
-			t.creationDate,
-			t.userModificationDate,
-			t.startDate,
-			t.deadline,
-			t.stopDate,
-			COALESCE(a.title, pa.title, hpa.title) as area_name,
-			COALESCE(p.uuid, hp.uuid) as project_uuid,
-			COALESCE(p.title, hp.title) as project_name,
-			h.uuid as heading_uuid,
-			h.title as heading_name,
-			GROUP_CONCAT(tag.title, ', ') as tags,
-			CASE WHEN t.rt1_repeatingTemplate IS NOT NULL THEN 1 ELSE 0 END as is_repeating,
-			t.todayIndex
-		FROM TMTask t
-		LEFT JOIN TMArea a ON t.area = a.uuid
-		LEFT JOIN TMTask p ON t.project = p.uuid AND p.type = 1
-		LEFT JOIN TMArea pa ON p.area = pa.uuid
-		LEFT JOIN TMTask h ON t.heading = h.uuid
-		LEFT JOIN TMTask hp ON h.project = hp.uuid AND hp.type = 1
-		LEFT JOIN TMArea hpa ON hp.area = hpa.uuid
-		LEFT JOIN TMTaskTag tt ON t.uuid = tt.tasks
-		LEFT JOIN TMTag tag ON tt.tags = tag.uuid
-		WHERE t.type = 0 AND t.trashed = 0 AND t.status = 0
-			AND t.start = 2
 			AND t.startDate IS NULL
+			AND (t.rt1_nextInstanceStartDate IS NULL OR t.rt1_nextInstanceStartDate < %d)
 			AND (t.project IS NULL OR p.trashed = 0)
 			AND (hp.trashed IS NULL OR hp.trashed = 0)
 		GROUP BY t.uuid
 		ORDER BY t."index"
-	`
+	`, minRealDate)
 
 	rows, err := db.conn.Query(query)
 	if err != nil {
