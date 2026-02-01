@@ -179,6 +179,7 @@ func (db *ThingsDB) GetTask(uuid string) (*models.Task, error) {
 
 // ListProjects returns all projects
 func (db *ThingsDB) ListProjects(includeCompleted bool) ([]models.Project, error) {
+	// Use Things' pre-computed counts which include tasks in headings
 	query := `
 		SELECT
 			p.uuid,
@@ -186,11 +187,10 @@ func (db *ThingsDB) ListProjects(includeCompleted bool) ([]models.Project, error
 			p.notes,
 			p.status,
 			a.title as area_name,
-			COUNT(DISTINCT CASE WHEN t.type = 0 AND t.status = 0 THEN t.uuid END) as open_tasks,
-			COUNT(DISTINCT CASE WHEN t.type = 0 THEN t.uuid END) as total_tasks
+			p.openUntrashedLeafActionsCount as open_tasks,
+			p.untrashedLeafActionsCount as total_tasks
 		FROM TMTask p
 		LEFT JOIN TMArea a ON p.area = a.uuid
-		LEFT JOIN TMTask t ON t.project = p.uuid AND t.trashed = 0
 		WHERE p.type = 1 AND p.trashed = 0
 	`
 
@@ -198,7 +198,7 @@ func (db *ThingsDB) ListProjects(includeCompleted bool) ([]models.Project, error
 		query += " AND p.status = 0"
 	}
 
-	query += ` GROUP BY p.uuid ORDER BY p."index"`
+	query += ` ORDER BY p."index"`
 
 	rows, err := db.conn.Query(query)
 	if err != nil {
@@ -211,6 +211,7 @@ func (db *ThingsDB) ListProjects(includeCompleted bool) ([]models.Project, error
 
 // GetProject returns a single project by UUID
 func (db *ThingsDB) GetProject(uuid string) (*models.Project, error) {
+	// Use Things' pre-computed counts which include tasks in headings
 	query := `
 		SELECT
 			p.uuid,
@@ -218,13 +219,11 @@ func (db *ThingsDB) GetProject(uuid string) (*models.Project, error) {
 			p.notes,
 			p.status,
 			a.title as area_name,
-			COUNT(DISTINCT CASE WHEN t.type = 0 AND t.status = 0 THEN t.uuid END) as open_tasks,
-			COUNT(DISTINCT CASE WHEN t.type = 0 THEN t.uuid END) as total_tasks
+			p.openUntrashedLeafActionsCount as open_tasks,
+			p.untrashedLeafActionsCount as total_tasks
 		FROM TMTask p
 		LEFT JOIN TMArea a ON p.area = a.uuid
-		LEFT JOIN TMTask t ON t.project = p.uuid AND t.trashed = 0
 		WHERE p.uuid = ? AND p.type = 1
-		GROUP BY p.uuid
 	`
 
 	rows, err := db.conn.Query(query, uuid)
