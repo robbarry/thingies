@@ -90,6 +90,70 @@ func (f *TableFormatter) FormatTasks(tasks []models.Task) error {
 	return nil
 }
 
+// FormatUpcoming formats upcoming tasks with scheduled dates
+func (f *TableFormatter) FormatUpcoming(tasks []models.Task) error {
+	if len(tasks) == 0 {
+		fmt.Println(f.style(yellow, "No upcoming tasks found"))
+		return nil
+	}
+
+	for _, task := range tasks {
+		// Show short ID (first 8 chars of UUID)
+		shortID := task.UUID
+		if len(shortID) > 8 {
+			shortID = shortID[:8]
+		}
+
+		// Scheduled date (if present)
+		scheduled := ""
+		if task.Scheduled.Valid {
+			scheduled = task.Scheduled.Time.Format("01/02/2006")
+		}
+
+		status := models.TaskStatus(task.Status).Icon()
+		if task.IsRepeating {
+			status += " 🔁"
+		}
+
+		// Build context parts
+		var context []string
+		// Show Area > Project > Heading hierarchy
+		var hierarchy []string
+		if task.AreaName.Valid && task.AreaName.String != "" {
+			hierarchy = append(hierarchy, f.style(magenta, task.AreaName.String))
+		}
+		if task.ProjectName.Valid && task.ProjectName.String != "" {
+			hierarchy = append(hierarchy, f.style(blue, task.ProjectName.String))
+		}
+		if task.HeadingName.Valid && task.HeadingName.String != "" {
+			hierarchy = append(hierarchy, f.style(cyan, task.HeadingName.String))
+		}
+		if len(hierarchy) > 0 {
+			context = append(context, strings.Join(hierarchy, f.style(dim, " > ")))
+		}
+		if task.Deadline.Valid {
+			context = append(context, f.style(red, "due ")+f.style(red, task.Deadline.Time.Format("2006-01-02")))
+		}
+		if task.Tags.Valid && task.Tags.String != "" {
+			context = append(context, f.style(yellow, task.Tags.String))
+		}
+
+		var line string
+		if scheduled != "" {
+			line = fmt.Sprintf("%s %s %s %s", f.style(green, scheduled), f.style(dim, shortID), f.style(green, status), f.style(cyan, task.Title))
+		} else {
+			line = fmt.Sprintf("%s %s %s %s", f.style(dim, "          "), f.style(dim, shortID), f.style(green, status), f.style(cyan, task.Title))
+		}
+		if len(context) > 0 {
+			line += " " + f.style(dim, "(") + strings.Join(context, f.style(dim, ", ")) + f.style(dim, ")")
+		}
+		fmt.Println(line)
+	}
+
+	fmt.Println(f.style(dim, fmt.Sprintf("\n%d upcoming task(s)", len(tasks))))
+	return nil
+}
+
 // FormatLogbook formats completed tasks with completion dates
 func (f *TableFormatter) FormatLogbook(tasks []models.Task) error {
 	if len(tasks) == 0 {

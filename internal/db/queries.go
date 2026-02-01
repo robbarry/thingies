@@ -725,7 +725,9 @@ func (db *ThingsDB) GetTasksByTag(tagName string) ([]models.Task, error) {
 	return scanTasks(rows)
 }
 
-// GetUpcomingTasks returns tasks scheduled for the future (start=2/Someday with future startDate or rt1_nextInstanceStartDate)
+// GetUpcomingTasks returns tasks scheduled for the future:
+// - Tasks with future startDate or rt1_nextInstanceStartDate
+// - Repeating templates (tasks referenced by other tasks' rt1_repeatingTemplate)
 func (db *ThingsDB) GetUpcomingTasks() ([]models.Task, error) {
 	todayPacked := TodayPackedDate()
 	query := fmt.Sprintf(`
@@ -746,7 +748,7 @@ func (db *ThingsDB) GetUpcomingTasks() ([]models.Task, error) {
 			h.uuid as heading_uuid,
 			h.title as heading_name,
 			GROUP_CONCAT(tag.title, ', ') as tags,
-			CASE WHEN t.rt1_repeatingTemplate IS NOT NULL THEN 1 ELSE 0 END as is_repeating,
+			CASE WHEN t.rt1_repeatingTemplate IS NOT NULL OR EXISTS(SELECT 1 FROM TMTask i WHERE i.rt1_repeatingTemplate = t.uuid) THEN 1 ELSE 0 END as is_repeating,
 			t.todayIndex
 		FROM TMTask t
 		LEFT JOIN TMArea a ON t.area = a.uuid
@@ -762,11 +764,12 @@ func (db *ThingsDB) GetUpcomingTasks() ([]models.Task, error) {
 			AND (
 				(t.startDate IS NOT NULL AND t.startDate > %d)
 				OR (t.startDate IS NULL AND t.rt1_nextInstanceStartDate IS NOT NULL AND t.rt1_nextInstanceStartDate > %d)
+				OR (t.startDate IS NULL AND EXISTS(SELECT 1 FROM TMTask i WHERE i.rt1_repeatingTemplate = t.uuid AND i.status = 0 AND i.trashed = 0))
 			)
 			AND (t.project IS NULL OR p.trashed = 0)
 			AND (hp.trashed IS NULL OR hp.trashed = 0)
 		GROUP BY t.uuid
-		ORDER BY COALESCE(t.startDate, t.rt1_nextInstanceStartDate), t."index"
+		ORDER BY COALESCE(t.startDate, t.rt1_nextInstanceStartDate, 999999999), t."index"
 	`, todayPacked, todayPacked)
 
 	rows, err := db.conn.Query(query)
@@ -779,7 +782,9 @@ func (db *ThingsDB) GetUpcomingTasks() ([]models.Task, error) {
 }
 
 // GetSomedayTasks returns someday tasks (start=2/Someday with no scheduled date)
-// Excludes tasks with rt1_nextInstanceStartDate that indicates a real future date (year >= 2020)
+// Excludes:
+// - Tasks with rt1_nextInstanceStartDate that indicates a real future date (year >= 2020)
+// - Repeating templates that have active instances (these go in Upcoming)
 func (db *ThingsDB) GetSomedayTasks() ([]models.Task, error) {
 	// Packed date threshold: 2020-01-01 = 2020 << 16 | 1 << 12 | 1 << 7 = 132382848
 	minRealDate := 132382848
@@ -816,6 +821,7 @@ func (db *ThingsDB) GetSomedayTasks() ([]models.Task, error) {
 			AND t.start = 2
 			AND t.startDate IS NULL
 			AND (t.rt1_nextInstanceStartDate IS NULL OR t.rt1_nextInstanceStartDate < %d)
+			AND NOT EXISTS(SELECT 1 FROM TMTask i WHERE i.rt1_repeatingTemplate = t.uuid AND i.status = 0 AND i.trashed = 0)
 			AND (t.project IS NULL OR p.trashed = 0)
 			AND (hp.trashed IS NULL OR hp.trashed = 0)
 		GROUP BY t.uuid
