@@ -205,12 +205,14 @@ The `serve` command starts an HTTP server (default port 8484). All responses are
 <!-- SKILL-MAINTENANCE-START -->
 ## Skill Maintenance
 
-This tool has a corresponding skill in wsj-ai-skills at:
-`install/skills/things/`
+This tool's skill has moved to the **wsj-ai-plugin-marketplace**:
+`~/lrepos/wsj-ai-plugin-marketplace/plugins/things/skills/things/`
+
+The old copy in wsj-ai-skills (`install/skills/things/`) is deprecated.
 
 When making significant changes to this tool:
-1. Update the skill in wsj-ai-skills to reflect the changes
-2. Run `/skill-maintainer` to guide you through the update
+1. Update the skill in wsj-ai-plugin-marketplace to reflect the changes
+2. Key files: `SKILL.md` (main skill) and `references/rest-api.md` (API docs)
 
 The skill should document:
 - Core commands and workflows
