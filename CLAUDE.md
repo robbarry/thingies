@@ -54,6 +54,7 @@ thingies tasks show <uuid>                    # Full task details
 thingies tasks create "Title"                 # Create task
 thingies tasks create "Title" --when today --list "Project" --heading "Section"
 thingies tasks update <uuid> --title "New" --notes "..." --when tomorrow
+thingies tasks update <uuid> --when 2026-03-15  # Schedule to specific date (uses URL scheme)
 thingies tasks complete <uuid>                # Mark complete
 thingies tasks cancel <uuid>                  # Mark canceled
 thingies tasks delete <uuid>                  # Move to trash
@@ -149,6 +150,12 @@ tell application "Things3"
 end tell
 ```
 AppleScript can update notes without an auth token (unlike URL scheme).
+Note: `activation date` is read-only in AppleScript, so specific date scheduling uses the URL scheme with an auth token from `TMSettings.uriSchemeAuthenticationToken`.
+
+**URL Scheme (updates with specific dates):**
+```
+things:///update?id=UUID&auth-token=TOKEN&when=2026-03-15
+```
 
 ### REST API Endpoints
 

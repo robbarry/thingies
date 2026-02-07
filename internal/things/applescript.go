@@ -3,6 +3,7 @@ package things
 import (
 	"fmt"
 	"os/exec"
+	"regexp"
 	"strings"
 )
 
@@ -56,14 +57,22 @@ end tell`, uuid)
 	return runAppleScript(script)
 }
 
+var datePattern = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`)
+
+// IsSpecificDate returns true if the value is a YYYY-MM-DD date string
+func IsSpecificDate(when string) bool {
+	return datePattern.MatchString(when)
+}
+
 // TaskUpdateParams contains parameters for updating a task via AppleScript
 type TaskUpdateParams struct {
-	UUID     string
-	Name     string // title
-	Notes    string
-	DueDate  string // YYYY-MM-DD format
-	When     string // "today", "tomorrow", "evening", "anytime", "someday", or YYYY-MM-DD
-	TagNames string // comma-separated
+	UUID      string
+	Name      string // title
+	Notes     string
+	DueDate   string // YYYY-MM-DD format
+	When      string // "today", "tomorrow", "evening", "anytime", "someday", or YYYY-MM-DD
+	TagNames  string // comma-separated
+	AuthToken string // required for specific date scheduling via URL scheme
 }
 
 // UpdateTask updates a task's properties via AppleScript
@@ -91,9 +100,14 @@ func UpdateTask(params TaskUpdateParams) error {
 		case "someday":
 			statements = append(statements, `move theTodo to list "Someday"`)
 		default:
-			// Specific dates (YYYY-MM-DD) cannot be set via AppleScript
-			// The activation date property is read-only
-			return fmt.Errorf("cannot set specific date '%s' via AppleScript; Things 3 activation date is read-only. Use 'today', 'tomorrow', 'anytime', or 'someday' instead", params.When)
+			if !datePattern.MatchString(params.When) {
+				return fmt.Errorf("invalid when value '%s': use 'today', 'tomorrow', 'anytime', 'someday', or YYYY-MM-DD", params.When)
+			}
+			// Specific dates require the URL scheme (AppleScript activation date is read-only)
+			if params.AuthToken == "" {
+				return fmt.Errorf("auth token required for specific date scheduling")
+			}
+			return updateViaURLScheme(params)
 		}
 	}
 	if params.TagNames != "" {
@@ -110,6 +124,22 @@ func UpdateTask(params TaskUpdateParams) error {
 end tell`, params.UUID, strings.Join(statements, "\n\t"))
 
 	return runAppleScript(script)
+}
+
+// updateViaURLScheme updates a task using the things:///update URL scheme.
+// Used for specific date scheduling since AppleScript's activation date is read-only.
+func updateViaURLScheme(params TaskUpdateParams) error {
+	updateParams := UpdateParams{
+		ID:        params.UUID,
+		AuthToken: params.AuthToken,
+		Title:     params.Name,
+		Notes:     params.Notes,
+		When:      params.When,
+		Deadline:  params.DueDate,
+		Tags:      params.TagNames,
+	}
+	url := BuildUpdateURL(updateParams)
+	return OpenURL(url)
 }
 
 // ProjectUpdateParams contains parameters for updating a project via AppleScript

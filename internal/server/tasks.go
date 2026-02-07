@@ -116,6 +116,16 @@ func (s *Server) handleUpdateTask(w http.ResponseWriter, r *http.Request) {
 		TagNames: req.Tags,
 	}
 
+	// Specific dates need an auth token for the URL scheme
+	if things.IsSpecificDate(req.When) {
+		token, err := s.db.GetAuthToken()
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "failed to get auth token: "+err.Error())
+			return
+		}
+		params.AuthToken = token
+	}
+
 	if err := things.UpdateTask(params); err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to update task: "+err.Error())
 		return

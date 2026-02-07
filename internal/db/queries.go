@@ -838,15 +838,15 @@ func (db *ThingsDB) GetSomedayTasks() ([]models.Task, error) {
 
 // GetAuthToken retrieves the URL scheme authentication token
 func (db *ThingsDB) GetAuthToken() (string, error) {
-	var settings sql.NullString
-	err := db.conn.QueryRow("SELECT plistData FROM TMSettings LIMIT 1").Scan(&settings)
+	var token sql.NullString
+	err := db.conn.QueryRow("SELECT uriSchemeAuthenticationToken FROM TMSettings LIMIT 1").Scan(&token)
 	if err != nil {
-		return "", fmt.Errorf("failed to query settings: %w", err)
+		return "", fmt.Errorf("failed to query auth token: %w", err)
 	}
-
-	// The auth token is stored in the plist data - for now return empty
-	// TODO: Parse plist to extract uriSchemeAuthenticationToken
-	return "", nil
+	if !token.Valid || token.String == "" {
+		return "", fmt.Errorf("no auth token found in Things database")
+	}
+	return token.String, nil
 }
 
 // GetLogbook returns completed tasks ordered by completion date
