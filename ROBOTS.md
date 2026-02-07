@@ -239,22 +239,22 @@ Endpoints mirror the CLI: `/today`, `/inbox`, `/upcoming`, `/tasks`, `/projects`
 
 Use when the CLI is unavailable (e.g., remote access, different machine without the code).
 
-**Base URL:** `${THINGS_API_URL}` (defaults to `https://vega.taildef9.ts.net`)
+**Base URL:** `${THINGS_API_URL}` (defaults to `http://localhost:8484`)
 
 ```bash
 # Snapshot
-curl -s "${THINGS_API_URL:-https://vega.taildef9.ts.net}/snapshot" | jq -r .snapshot
+curl -s "${THINGS_API_URL:-http://localhost:8484}/snapshot" | jq -r .snapshot
 
 # Today
-curl -s "${THINGS_API_URL:-https://vega.taildef9.ts.net}/today" | jq
+curl -s "${THINGS_API_URL:-http://localhost:8484}/today" | jq
 
 # Add task
-curl -s -X POST "${THINGS_API_URL:-https://vega.taildef9.ts.net}/tasks" \
+curl -s -X POST "${THINGS_API_URL:-http://localhost:8484}/tasks" \
   -H "Content-Type: application/json" \
   -d '{"title": "New task", "when": "today"}' | jq
 
 # Complete task
-curl -s -X POST "${THINGS_API_URL:-https://vega.taildef9.ts.net}/tasks/{uuid}/complete" | jq
+curl -s -X POST "${THINGS_API_URL:-http://localhost:8484}/tasks/{uuid}/complete" | jq
 ```
 
 See `references/rest-api.md` for complete API documentation.
@@ -263,10 +263,7 @@ See `references/rest-api.md` for complete API documentation.
 
 ```bash
 # Check if API is responding
-curl -s "${THINGS_API_URL:-https://vega.taildef9.ts.net}/health" | jq
-
-# Restart if needed
-ssh vega 'PATH=/Users/rob/.nvm/versions/node/v22.19.0/bin:$PATH pm2 restart things-api'
+curl -s "${THINGS_API_URL:-http://localhost:8484}/health" | jq
 ```
 
 ---
