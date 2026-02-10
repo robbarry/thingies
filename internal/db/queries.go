@@ -109,7 +109,7 @@ func (db *ThingsDB) ListTasks(filter TaskFilter) ([]models.Task, error) {
 
 	// Tag filter (HAVING because of GROUP_CONCAT)
 	if filter.Tag != "" {
-		query += " HAVING LOWER(tags) LIKE LOWER(?)"
+		query += " HAVING LOWER(GROUP_CONCAT(tag.title, ', ')) LIKE LOWER(?)"
 		params = append(params, "%"+filter.Tag+"%")
 	}
 
