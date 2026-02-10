@@ -1,3 +1,6 @@
+{"date": "2026-02-10", "category": "Fixed", "description": "`--tag` filter on task list returning empty results due to referencing unavailable column alias in HAVING clause", "commits": ["4aa770e"]}
+{"date": "2026-02-07", "category": "Added", "description": "Specific date scheduling (YYYY-MM-DD) in `tasks update --when`, using Things URL scheme with auth token for dates AppleScript can't set", "commits": ["3957017"]}
+{"date": "2026-02-07", "category": "Changed", "description": "GetAuthToken now reads `uriSchemeAuthenticationToken` column directly instead of attempting plist parsing", "commits": ["3957017"]}
 {"date": "2026-01-31", "category": "Added", "description": "POST /projects endpoint for creating projects via REST API", "commits": ["684cbbf"]}
 {"date": "2026-01-31", "category": "Fixed", "description": "Repeating tasks now correctly appear in upcoming/someday views", "commits": ["f2e5502"]}
 {"date": "2026-01-31", "category": "Changed", "description": "Default HTTP server port changed to 8484", "commits": ["4655d0b"]}

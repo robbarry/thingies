@@ -5,7 +5,7 @@ A Go CLI and REST API for Things 3 with full CRUD access.
 ## Requirements
 
 - macOS with Things 3 installed
-- Go 1.21+ (for building)
+- Go 1.21+ (for building from source)
 
 ## Install
 
@@ -37,7 +37,8 @@ thingies snapshot           # Hierarchical view (areas -> projects -> tasks)
 
 ```bash
 thingies search "keyword"
-thingies search "keyword" --in-notes  # Also search notes
+thingies search "keyword" --in-notes        # Also search notes
+thingies search "keyword" --include-future  # Include future repeating task instances
 ```
 
 ### Tasks
@@ -48,18 +49,23 @@ thingies tasks list --status all                       # Include completed/cance
 thingies tasks list --today                            # Only Today view
 thingies tasks list --area "Work"                      # Filter by area
 thingies tasks list --project "Bills" --tag "urgent"   # Filter by project and tag
+thingies tasks list --include-future                   # Include future repeating instances
 
 thingies tasks show <uuid>                             # Full task details
 thingies tasks create "New task"                       # Create task
 thingies tasks create "New task" --when today --list "Project" --heading "Section"
 thingies tasks create "New task" --deadline 2026-02-15 # With due date
 
-thingies tasks update <uuid> --title "New" --notes "Updated" --when tomorrow
+thingies tasks update <uuid> --title "New" --notes "Updated"
+thingies tasks update <uuid> --when tomorrow           # Schedule for tomorrow
+thingies tasks update <uuid> --when 2026-03-15         # Schedule to specific date
 thingies tasks update <uuid> --deadline 2026-02-15     # Set due date
 thingies tasks complete <uuid>
 thingies tasks cancel <uuid>
 thingies tasks delete <uuid>
 ```
+
+The `--when` flag accepts: `today`, `tomorrow`, `evening`, `anytime`, `someday`, or a date as `YYYY-MM-DD`.
 
 ### Projects
 
@@ -115,40 +121,51 @@ thingies serve -p 3000      # Custom port
 thingies serve --host 127.0.0.1  # Localhost only
 ```
 
+All responses are JSON. CORS is enabled for all origins.
+
 ### Endpoints
 
 **Views:**
-- `GET /today`, `/inbox`, `/upcoming`, `/someday`, `/anytime`, `/logbook`, `/deadlines`
-- `GET /snapshot` - Full hierarchical view as JSON
+- `GET /today` - Today's tasks
+- `GET /inbox` - Inbox tasks
+- `GET /upcoming` - Upcoming scheduled tasks
+- `GET /someday` - Someday tasks
+- `GET /anytime` - Anytime tasks
+- `GET /logbook` - Completed tasks (query: `limit`, default 50)
+- `GET /deadlines` - Tasks with upcoming deadlines (query: `days`, default 7)
+- `GET /snapshot` - Full hierarchical view as text
 
 **Tasks:**
-- `GET /tasks` - List tasks
-- `GET /tasks/search?q=query` - Search tasks
-- `POST /tasks` - Create task
+- `GET /tasks` - List tasks (query: `status`, `area`, `project`, `tag`, `today`, `include-future`)
+- `GET /tasks/search?q=query` - Search tasks (query: `in-notes`, `include-future`)
 - `GET /tasks/{uuid}` - Get task
-- `PATCH /tasks/{uuid}` - Update task
+- `POST /tasks` - Create task (body: `title`, `notes`, `when`, `deadline`, `tags`, `list`, `heading`)
+- `PATCH /tasks/{uuid}` - Update task (body: `title`, `notes`, `when`, `deadline`, `tags`)
 - `DELETE /tasks/{uuid}` - Delete task
-- `POST /tasks/{uuid}/complete`, `/cancel`, `/move-to-today`, `/move-to-someday`
+- `POST /tasks/{uuid}/complete` - Mark complete
+- `POST /tasks/{uuid}/cancel` - Mark canceled
+- `POST /tasks/{uuid}/move-to-today` - Move to Today
+- `POST /tasks/{uuid}/move-to-someday` - Move to Someday
 
 **Projects:**
-- `GET /projects` - List projects
-- `POST /projects` - Create project
+- `GET /projects` - List projects (query: `include-completed`)
 - `GET /projects/{uuid}` - Get project
-- `GET /projects/{uuid}/tasks` - Get project tasks
+- `GET /projects/{uuid}/tasks` - Get project tasks (query: `include-completed`)
 - `GET /projects/{uuid}/headings` - Get project headings
+- `POST /projects` - Create project (body: `title`, `notes`, `when`, `deadline`, `tags`, `area`, `todos`)
 
 **Areas:**
 - `GET /areas` - List areas
 - `GET /areas/{uuid}` - Get area
-- `GET /areas/{uuid}/tasks` - Get area tasks
-- `GET /areas/{uuid}/projects` - Get area projects
+- `GET /areas/{uuid}/tasks` - Get area tasks (query: `include_completed`)
+- `GET /areas/{uuid}/projects` - Get area projects (query: `include_completed`)
 
 **Tags:**
 - `GET /tags` - List tags
 - `GET /tags/{name}/tasks` - Get tasks by tag
 
 **Headings:**
-- `PATCH /headings/{uuid}` - Update heading
+- `PATCH /headings/{uuid}` - Update heading (body: `title`)
 - `DELETE /headings/{uuid}` - Delete heading
 
 **Health:**
@@ -156,11 +173,12 @@ thingies serve --host 127.0.0.1  # Localhost only
 
 ## How It Works
 
-- **Reads**: Direct SQLite access (fast, no app launch needed)
+- **Reads**: Direct SQLite access to the Things 3 database (fast, no app launch needed)
 - **Creates**: Things URL scheme (`things:///add`, `things:///add-project`)
 - **Updates/Deletes/Completes**: AppleScript via `osascript`
+- **Specific date scheduling**: Things URL scheme with auth token (AppleScript cannot set activation dates)
 
-The database is accessed read-only using a pure Go SQLite driver (no CGO required).
+The database is accessed read-only using a pure Go SQLite driver (no CGO required). The database path is auto-detected from the standard Things 3 location.
 
 ## Shell Completions
 

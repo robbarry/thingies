@@ -37,8 +37,9 @@ thingies upcoming                 # Future scheduled tasks
 thingies someday                  # Tasks deferred to someday
 thingies anytime                  # Available but not scheduled
 thingies logbook -n 50            # Completed tasks (default 50)
-thingies search <query>           # Search by title
-thingies search <query> --in-notes           # Also search notes
+thingies search <query>                       # Search by title
+thingies search <query> --in-notes            # Also search notes
+thingies search <query> --include-future      # Include future repeating tasks
 thingies snapshot                 # Hierarchical view (areas → projects → tasks)
 ```
 
@@ -50,11 +51,14 @@ thingies tasks list --today                   # Only Today view
 thingies tasks list --area "Work"             # Filter by area (name or UUID)
 thingies tasks list --project "Bills"         # Filter by project (name or UUID)
 thingies tasks list --tag "urgent"            # Filter by tag
+thingies tasks list --include-future          # Include future repeating task instances
 thingies tasks show <uuid>                    # Full task details
 thingies tasks create "Title"                 # Create task
 thingies tasks create "Title" --when today --list "Project" --heading "Section"
+thingies tasks create "Title" --deadline 2026-02-15  # With due date
 thingies tasks update <uuid> --title "New" --notes "..." --when tomorrow
 thingies tasks update <uuid> --when 2026-03-15  # Schedule to specific date (uses URL scheme)
+thingies tasks update <uuid> --deadline 2026-03-01  # Set due date
 thingies tasks complete <uuid>                # Mark complete
 thingies tasks cancel <uuid>                  # Mark canceled
 thingies tasks delete <uuid>                  # Move to trash
@@ -65,7 +69,9 @@ thingies tasks delete <uuid>                  # Move to trash
 thingies projects list                        # Active projects
 thingies projects show <uuid>                 # Project details + tasks
 thingies projects create "Title" --area "Work" --todos "Task 1\nTask 2"
+thingies projects create "Title" --deadline 2026-03-01  # With due date
 thingies projects update <uuid> --title "New" --notes "..."
+thingies projects update <uuid> --deadline 2026-03-01   # Set due date
 thingies projects complete <uuid>
 thingies projects delete <uuid>
 ```
@@ -103,6 +109,16 @@ thingies serve --host 127.0.0.1   # Localhost only
 --verbose    Verbose output
 ```
 
+### `--when` Values
+The `--when` flag accepts: `today`, `tomorrow`, `evening`, `anytime`, `someday`, or a specific date as `YYYY-MM-DD`. Specific dates require the URL scheme with an auth token (handled automatically).
+
+### Command Aliases
+```
+tasks → task, t          projects → project, p
+areas → area, a          tags → tag
+snapshot → all
+```
+
 ### Name Resolution
 Most commands accept either a UUID or a name for areas/projects. Names are resolved to UUIDs automatically; if multiple items match a name, you'll be prompted to use the UUID instead.
 
@@ -111,7 +127,7 @@ Most commands accept either a UUID or a name for areas/projects. Names are resol
 ### Key Packages
 - `internal/cmd/` - Cobra commands organized by resource (`tasks/`, `projects/`, `areas/`, `tags/`) plus view commands (`today.go`, `inbox.go`, `upcoming.go`, `someday.go`, `anytime.go`, `logbook.go`)
 - `internal/db/` - SQLite database layer: `db.go` (connection), `queries.go` (SQL), `scanner.go` (row scanning), `resolve.go` (name→UUID resolution)
-- `internal/server/` - HTTP REST API server with handlers for tasks, projects, areas, tags, and views
+- `internal/server/` - HTTP REST API server using Go 1.22+ `ServeMux` routing patterns (`GET /tasks/{uuid}`)
 - `internal/things/` - Things 3 integration: `urlscheme.go` (URL builder), `applescript.go` (osascript), `opener.go` (macOS open)
 - `internal/models/` - Data models: Task, Project, Area, Tag, Heading, ChecklistItem
 - `internal/output/` - Formatters: table (lipgloss) and JSON
@@ -159,10 +175,11 @@ things:///update?id=UUID&auth-token=TOKEN&when=2026-03-15
 
 ### REST API Endpoints
 
-The `serve` command starts an HTTP server (default port 8484). All responses are JSON.
+The `serve` command starts an HTTP server (default port 8484). All responses are JSON. CORS is enabled (`*` origin) for local development.
 
 **Views:**
-- `GET /today`, `/inbox`, `/upcoming`, `/someday`, `/anytime`, `/logbook`, `/deadlines`
+- `GET /today`, `/inbox`, `/upcoming`, `/someday`, `/anytime`, `/logbook`
+- `GET /deadlines` - API-only (no CLI equivalent), returns tasks with upcoming deadlines
 - `GET /snapshot` - Full hierarchical view as JSON
 
 **Tasks:**
