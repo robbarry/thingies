@@ -4,6 +4,8 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
+	"thingies/internal/cmd/shared"
+	"thingies/internal/db"
 	"thingies/internal/things"
 )
 
@@ -30,8 +32,19 @@ func init() {
 }
 
 func runUpdate(cmd *cobra.Command, args []string) error {
+	thingsDB, err := db.Open(shared.GetDBPath(cmd))
+	if err != nil {
+		return err
+	}
+	defer thingsDB.Close()
+
+	uuid, err := thingsDB.ResolveProjectUUID(args[0])
+	if err != nil {
+		return err
+	}
+
 	params := things.ProjectUpdateParams{
-		UUID:     args[0],
+		UUID:     uuid,
 		Name:     updateTitle,
 		Notes:    updateNotes,
 		DueDate:  updateDeadline,
@@ -42,6 +55,6 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to update project: %w", err)
 	}
 
-	fmt.Printf("Updated project: %s\n", args[0])
+	fmt.Printf("Updated project: %s\n", uuid)
 	return nil
 }

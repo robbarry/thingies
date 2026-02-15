@@ -206,9 +206,15 @@ func (s *Server) handleGetProject(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	project, err := s.db.GetProject(uuid)
+	resolved, err := s.db.ResolveProjectUUID(uuid)
 	if err != nil {
-		if err.Error() == fmt.Sprintf("project not found: %s", uuid) {
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+
+	project, err := s.db.GetProject(resolved)
+	if err != nil {
+		if strings.Contains(err.Error(), "not found") {
 			http.Error(w, err.Error(), http.StatusNotFound)
 			return
 		}
@@ -227,6 +233,13 @@ func (s *Server) handleGetProjectTasks(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "uuid required", http.StatusBadRequest)
 		return
 	}
+
+	resolved, err := s.db.ResolveProjectUUID(uuid)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+	uuid = resolved
 
 	includeCompleted := r.URL.Query().Get("include-completed") == "true"
 
@@ -253,6 +266,13 @@ func (s *Server) handleGetProjectHeadings(w http.ResponseWriter, r *http.Request
 		http.Error(w, "uuid required", http.StatusBadRequest)
 		return
 	}
+
+	resolved, err := s.db.ResolveProjectUUID(uuid)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+	uuid = resolved
 
 	headings, err := s.db.GetProjectHeadings(uuid)
 	if err != nil {
@@ -545,7 +565,13 @@ func (s *Server) handleGetArea(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	area, err := s.db.GetArea(uuid)
+	resolved, err := s.db.ResolveAreaUUID(uuid)
+	if err != nil {
+		writeError(w, http.StatusNotFound, err.Error())
+		return
+	}
+
+	area, err := s.db.GetArea(resolved)
 	if err != nil {
 		if strings.Contains(err.Error(), "not found") {
 			writeError(w, http.StatusNotFound, err.Error())
@@ -566,8 +592,15 @@ func (s *Server) handleGetAreaTasks(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	resolved, err := s.db.ResolveAreaUUID(uuid)
+	if err != nil {
+		writeError(w, http.StatusNotFound, err.Error())
+		return
+	}
+	uuid = resolved
+
 	// Check if area exists first
-	_, err := s.db.GetArea(uuid)
+	_, err = s.db.GetArea(uuid)
 	if err != nil {
 		if strings.Contains(err.Error(), "not found") {
 			writeError(w, http.StatusNotFound, err.Error())
@@ -595,8 +628,15 @@ func (s *Server) handleGetAreaProjects(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	resolved, err := s.db.ResolveAreaUUID(uuid)
+	if err != nil {
+		writeError(w, http.StatusNotFound, err.Error())
+		return
+	}
+	uuid = resolved
+
 	// Check if area exists first
-	_, err := s.db.GetArea(uuid)
+	_, err = s.db.GetArea(uuid)
 	if err != nil {
 		if strings.Contains(err.Error(), "not found") {
 			writeError(w, http.StatusNotFound, err.Error())

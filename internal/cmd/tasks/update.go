@@ -34,8 +34,19 @@ func init() {
 }
 
 func runUpdate(cmd *cobra.Command, args []string) error {
+	thingsDB, err := db.Open(shared.GetDBPath(cmd))
+	if err != nil {
+		return err
+	}
+	defer thingsDB.Close()
+
+	uuid, err := thingsDB.ResolveTaskUUID(args[0])
+	if err != nil {
+		return err
+	}
+
 	params := things.TaskUpdateParams{
-		UUID:     args[0],
+		UUID:     uuid,
 		Name:     updateTitle,
 		Notes:    updateNotes,
 		When:     updateWhen,
@@ -45,12 +56,6 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 
 	// Specific dates need an auth token for the URL scheme
 	if things.IsSpecificDate(updateWhen) {
-		thingsDB, err := db.Open(shared.GetDBPath(cmd))
-		if err != nil {
-			return fmt.Errorf("failed to open database for auth token: %w", err)
-		}
-		defer thingsDB.Close()
-
 		token, err := thingsDB.GetAuthToken()
 		if err != nil {
 			return fmt.Errorf("failed to get auth token: %w", err)
@@ -62,6 +67,6 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to update task: %w", err)
 	}
 
-	fmt.Printf("Updated task: %s\n", args[0])
+	fmt.Printf("Updated task: %s\n", uuid)
 	return nil
 }

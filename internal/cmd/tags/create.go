@@ -4,6 +4,8 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
+	"thingies/internal/cmd/shared"
+	"thingies/internal/db"
 	"thingies/internal/things"
 )
 
@@ -22,6 +24,21 @@ func init() {
 
 func runCreate(cmd *cobra.Command, args []string) error {
 	name := args[0]
+
+	// Resolve parent tag UUID if provided
+	if parentTag != "" {
+		thingsDB, err := db.Open(shared.GetDBPath(cmd))
+		if err != nil {
+			return err
+		}
+		defer thingsDB.Close()
+
+		resolved, err := thingsDB.ResolveTagUUID(parentTag)
+		if err != nil {
+			return err
+		}
+		parentTag = resolved
+	}
 
 	uuid, err := things.CreateTag(name, parentTag)
 	if err != nil {

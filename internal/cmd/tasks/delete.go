@@ -27,18 +27,20 @@ func init() {
 }
 
 func runDelete(cmd *cobra.Command, args []string) error {
-	uuid := args[0]
+	thingsDB, err := db.Open(shared.GetDBPath(cmd))
+	if err != nil {
+		return err
+	}
+	defer thingsDB.Close()
+
+	uuid, err := thingsDB.ResolveTaskUUID(args[0])
+	if err != nil {
+		return err
+	}
 
 	// Get task info for confirmation
 	if !deleteForce {
-		thingsDB, err := db.Open(shared.GetDBPath(cmd))
-		if err != nil {
-			return err
-		}
-
 		task, err := thingsDB.GetTask(uuid)
-		thingsDB.Close()
-
 		if err != nil {
 			return err
 		}

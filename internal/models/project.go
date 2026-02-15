@@ -4,13 +4,13 @@ import "database/sql"
 
 // Project represents a Things 3 project
 type Project struct {
-	UUID         string         `json:"uuid"`
-	Title        string         `json:"title"`
-	Notes        sql.NullString `json:"notes,omitempty"`
-	Status       TaskStatus     `json:"status"`
-	AreaName     sql.NullString `json:"area_name,omitempty"`
-	OpenTasks    int            `json:"open_tasks"`
-	TotalTasks   int            `json:"total_tasks"`
+	UUID       string         `json:"uuid"`
+	Title      string         `json:"title"`
+	Notes      sql.NullString `json:"notes,omitempty"`
+	Status     TaskStatus     `json:"status"`
+	AreaName   sql.NullString `json:"area_name,omitempty"`
+	OpenTasks  int            `json:"open_tasks"`
+	TotalTasks int            `json:"total_tasks"`
 }
 
 // ProjectJSON is the JSON-serializable version of Project

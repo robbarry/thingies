@@ -7,15 +7,15 @@ import (
 
 // AddParams contains parameters for creating a task
 type AddParams struct {
-	Title     string
-	Notes     string
-	When      string
-	Deadline  string
-	Tags      string
-	List      string
-	Heading   string
-	Completed bool
-	Canceled  bool
+	Title          string
+	Notes          string
+	When           string
+	Deadline       string
+	Tags           string
+	List           string
+	Heading        string
+	Completed      bool
+	Canceled       bool
 	ChecklistItems []string
 }
 

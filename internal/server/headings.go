@@ -20,6 +20,13 @@ func (s *Server) handleDeleteHeading(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	resolved, err := s.db.ResolveHeadingUUID(uuid)
+	if err != nil {
+		s.writeError(w, http.StatusNotFound, err.Error())
+		return
+	}
+	uuid = resolved
+
 	if err := things.DeleteHeading(uuid); err != nil {
 		s.writeError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -39,6 +46,13 @@ func (s *Server) handleUpdateHeading(w http.ResponseWriter, r *http.Request) {
 		s.writeError(w, http.StatusBadRequest, "missing uuid")
 		return
 	}
+
+	resolved, err := s.db.ResolveHeadingUUID(uuid)
+	if err != nil {
+		s.writeError(w, http.StatusNotFound, err.Error())
+		return
+	}
+	uuid = resolved
 
 	var req headingUpdateRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {

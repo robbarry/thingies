@@ -4,6 +4,8 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
+	"thingies/internal/cmd/shared"
+	"thingies/internal/db"
 	"thingies/internal/things"
 )
 
@@ -16,7 +18,16 @@ var cancelCmd = &cobra.Command{
 }
 
 func runCancel(cmd *cobra.Command, args []string) error {
-	uuid := args[0]
+	thingsDB, err := db.Open(shared.GetDBPath(cmd))
+	if err != nil {
+		return err
+	}
+	defer thingsDB.Close()
+
+	uuid, err := thingsDB.ResolveTaskUUID(args[0])
+	if err != nil {
+		return err
+	}
 
 	if err := things.CancelTask(uuid); err != nil {
 		return fmt.Errorf("failed to cancel task: %w", err)

@@ -5,11 +5,10 @@ import (
 	"regexp"
 )
 
-// uuidPattern matches Things UUIDs: XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX (36 chars with dashes)
-var uuidPattern = regexp.MustCompile(`^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$`)
+// uuidPattern matches Things UUIDs: 22-character base62 alphanumeric strings
+var uuidPattern = regexp.MustCompile(`^[0-9A-Za-z]{22}$`)
 
-// LooksLikeUUID checks if string appears to be a UUID
-// Things UUIDs are 36 chars with dashes: XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX
+// LooksLikeUUID checks if string appears to be a full Things UUID (22 alphanumeric chars)
 func LooksLikeUUID(s string) bool {
 	return uuidPattern.MatchString(s)
 }
@@ -76,9 +75,8 @@ func (db *ThingsDB) GetAreaUUIDByName(name string) (string, error) {
 	return uuids[0], nil
 }
 
-// ResolveProjectID returns UUID for a project given name or UUID
-// If the input looks like a UUID, it's returned as-is (after validation)
-// Otherwise, it's looked up by name
+// ResolveProjectID returns UUID for a project given name, full UUID, or short UUID prefix.
+// Tries in order: full UUID match, short UUID prefix, name lookup.
 func (db *ThingsDB) ResolveProjectID(nameOrUUID string) (string, error) {
 	if LooksLikeUUID(nameOrUUID) {
 		// Verify the UUID exists
@@ -89,12 +87,18 @@ func (db *ThingsDB) ResolveProjectID(nameOrUUID string) (string, error) {
 		}
 		return nameOrUUID, nil
 	}
+
+	// Try short UUID prefix resolution first
+	if resolved, err := db.ResolveProjectUUID(nameOrUUID); err == nil {
+		return resolved, nil
+	}
+
+	// Fall back to name lookup
 	return db.GetProjectUUIDByName(nameOrUUID)
 }
 
-// ResolveAreaID returns UUID for an area given name or UUID
-// If the input looks like a UUID, it's returned as-is (after validation)
-// Otherwise, it's looked up by name
+// ResolveAreaID returns UUID for an area given name, full UUID, or short UUID prefix.
+// Tries in order: full UUID match, short UUID prefix, name lookup.
 func (db *ThingsDB) ResolveAreaID(nameOrUUID string) (string, error) {
 	if LooksLikeUUID(nameOrUUID) {
 		// Verify the UUID exists
@@ -105,5 +109,12 @@ func (db *ThingsDB) ResolveAreaID(nameOrUUID string) (string, error) {
 		}
 		return nameOrUUID, nil
 	}
+
+	// Try short UUID prefix resolution first
+	if resolved, err := db.ResolveAreaUUID(nameOrUUID); err == nil {
+		return resolved, nil
+	}
+
+	// Fall back to name lookup
 	return db.GetAreaUUIDByName(nameOrUUID)
 }

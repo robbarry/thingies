@@ -113,9 +113,9 @@ func thingsDateToNullTime(ts sql.NullFloat64) sql.NullTime {
 	packed := int(ts.Float64)
 
 	// Extract year, month, day from packed bits
-	year := (packed & 0x7FF0000) >> 16  // bits 16-26
-	month := (packed & 0xF000) >> 12    // bits 12-15
-	day := (packed & 0xF80) >> 7        // bits 7-11
+	year := (packed & 0x7FF0000) >> 16 // bits 16-26
+	month := (packed & 0xF000) >> 12   // bits 12-15
+	day := (packed & 0xF80) >> 7       // bits 7-11
 
 	return sql.NullTime{
 		Time:  time.Date(year, time.Month(month), day, 0, 0, 0, 0, time.UTC),

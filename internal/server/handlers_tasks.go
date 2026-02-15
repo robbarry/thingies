@@ -39,7 +39,13 @@ func (s *Server) handleGetTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	task, err := s.db.GetTask(uuid)
+	resolved, err := s.db.ResolveTaskUUID(uuid)
+	if err != nil {
+		s.writeError(w, http.StatusNotFound, err.Error())
+		return
+	}
+
+	task, err := s.db.GetTask(resolved)
 	if err != nil {
 		if strings.Contains(err.Error(), "not found") {
 			s.writeError(w, http.StatusNotFound, err.Error())

@@ -67,7 +67,7 @@ func (db *ThingsDB) ListTasks(filter TaskFilter) ([]models.Task, error) {
 		conditions = append(conditions, "t.status = 3")
 	case "canceled":
 		conditions = append(conditions, "t.status = 2")
-	// "all" - no filter
+		// "all" - no filter
 	}
 
 	// Today filter based on things.py logic:
@@ -897,66 +897,93 @@ func (db *ThingsDB) GetLogbook(limit int) ([]models.Task, error) {
 	return scanTasks(rows)
 }
 
-// ResolveTaskUUID resolves a short UUID prefix to a full task UUID
+// ResolveTaskUUID resolves a short UUID prefix to a full task UUID.
+// If the input is already a full UUID (22 chars), it's returned as-is after verification.
 func (db *ThingsDB) ResolveTaskUUID(prefix string) (string, error) {
+	if len(prefix) >= 22 {
+		// Full UUID, verify it exists
+		var exists int
+		err := db.conn.QueryRow(`SELECT 1 FROM TMTask WHERE uuid = ? AND type = 0`, prefix).Scan(&exists)
+		if err != nil {
+			return "", fmt.Errorf("task not found: %s", prefix)
+		}
+		return prefix, nil
+	}
+
 	query := `SELECT uuid FROM TMTask WHERE uuid LIKE ? || '%' AND type = 0`
-	rows, err := db.conn.Query(query, prefix)
-	if err != nil {
-		return "", fmt.Errorf("failed to query task: %w", err)
-	}
-	defer rows.Close()
-
-	var uuids []string
-	for rows.Next() {
-		var uuid string
-		if err := rows.Scan(&uuid); err != nil {
-			return "", err
-		}
-		uuids = append(uuids, uuid)
-	}
-
-	if len(uuids) == 0 {
-		return "", fmt.Errorf("task not found: %s", prefix)
-	}
-	if len(uuids) > 1 {
-		return "", fmt.Errorf("ambiguous task prefix '%s' matches %d tasks", prefix, len(uuids))
-	}
-	return uuids[0], nil
+	return resolvePrefix(db, query, prefix, "task")
 }
 
-// ResolveAreaUUID resolves a short UUID prefix to a full area UUID
+// ResolveProjectUUID resolves a short UUID prefix to a full project UUID.
+// If the input is already a full UUID (22 chars), it's returned as-is after verification.
+func (db *ThingsDB) ResolveProjectUUID(prefix string) (string, error) {
+	if len(prefix) >= 22 {
+		var exists int
+		err := db.conn.QueryRow(`SELECT 1 FROM TMTask WHERE uuid = ? AND type = 1 AND trashed = 0`, prefix).Scan(&exists)
+		if err != nil {
+			return "", fmt.Errorf("project not found: %s", prefix)
+		}
+		return prefix, nil
+	}
+
+	query := `SELECT uuid FROM TMTask WHERE uuid LIKE ? || '%' AND type = 1 AND trashed = 0`
+	return resolvePrefix(db, query, prefix, "project")
+}
+
+// ResolveAreaUUID resolves a short UUID prefix to a full area UUID.
+// If the input is already a full UUID (22 chars), it's returned as-is after verification.
 func (db *ThingsDB) ResolveAreaUUID(prefix string) (string, error) {
-	query := `SELECT uuid FROM TMArea WHERE uuid LIKE ? || '%'`
-	rows, err := db.conn.Query(query, prefix)
-	if err != nil {
-		return "", fmt.Errorf("failed to query area: %w", err)
-	}
-	defer rows.Close()
-
-	var uuids []string
-	for rows.Next() {
-		var uuid string
-		if err := rows.Scan(&uuid); err != nil {
-			return "", err
+	if len(prefix) >= 22 {
+		var exists int
+		err := db.conn.QueryRow(`SELECT 1 FROM TMArea WHERE uuid = ?`, prefix).Scan(&exists)
+		if err != nil {
+			return "", fmt.Errorf("area not found: %s", prefix)
 		}
-		uuids = append(uuids, uuid)
+		return prefix, nil
 	}
 
-	if len(uuids) == 0 {
-		return "", fmt.Errorf("area not found: %s", prefix)
-	}
-	if len(uuids) > 1 {
-		return "", fmt.Errorf("ambiguous area prefix '%s' matches %d areas", prefix, len(uuids))
-	}
-	return uuids[0], nil
+	query := `SELECT uuid FROM TMArea WHERE uuid LIKE ? || '%'`
+	return resolvePrefix(db, query, prefix, "area")
 }
 
-// ResolveTagUUID resolves a short UUID prefix to a full tag UUID
+// ResolveTagUUID resolves a short UUID prefix to a full tag UUID.
+// If the input is already a full UUID (22 chars), it's returned as-is after verification.
 func (db *ThingsDB) ResolveTagUUID(prefix string) (string, error) {
+	if len(prefix) >= 22 {
+		var exists int
+		err := db.conn.QueryRow(`SELECT 1 FROM TMTag WHERE uuid = ?`, prefix).Scan(&exists)
+		if err != nil {
+			return "", fmt.Errorf("tag not found: %s", prefix)
+		}
+		return prefix, nil
+	}
+
 	query := `SELECT uuid FROM TMTag WHERE uuid LIKE ? || '%'`
+	return resolvePrefix(db, query, prefix, "tag")
+}
+
+// ResolveHeadingUUID resolves a short UUID prefix to a full heading UUID.
+// If the input is already a full UUID (22 chars), it's returned as-is after verification.
+func (db *ThingsDB) ResolveHeadingUUID(prefix string) (string, error) {
+	if len(prefix) >= 22 {
+		var exists int
+		err := db.conn.QueryRow(`SELECT 1 FROM TMTask WHERE uuid = ? AND type = 2`, prefix).Scan(&exists)
+		if err != nil {
+			return "", fmt.Errorf("heading not found: %s", prefix)
+		}
+		return prefix, nil
+	}
+
+	query := `SELECT uuid FROM TMTask WHERE uuid LIKE ? || '%' AND type = 2`
+	return resolvePrefix(db, query, prefix, "heading")
+}
+
+// resolvePrefix is a shared helper for resolving a short UUID prefix to a full UUID.
+// The query must select UUIDs with a single ? placeholder for the prefix.
+func resolvePrefix(db *ThingsDB, query, prefix, entityType string) (string, error) {
 	rows, err := db.conn.Query(query, prefix)
 	if err != nil {
-		return "", fmt.Errorf("failed to query tag: %w", err)
+		return "", fmt.Errorf("failed to query %s: %w", entityType, err)
 	}
 	defer rows.Close()
 
@@ -970,10 +997,10 @@ func (db *ThingsDB) ResolveTagUUID(prefix string) (string, error) {
 	}
 
 	if len(uuids) == 0 {
-		return "", fmt.Errorf("tag not found: %s", prefix)
+		return "", fmt.Errorf("%s not found: %s", entityType, prefix)
 	}
 	if len(uuids) > 1 {
-		return "", fmt.Errorf("ambiguous tag prefix '%s' matches %d tags", prefix, len(uuids))
+		return "", fmt.Errorf("ambiguous %s prefix '%s' matches %d %ss", entityType, prefix, len(uuids), entityType)
 	}
 	return uuids[0], nil
 }

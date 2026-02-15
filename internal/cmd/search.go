@@ -7,7 +7,7 @@ import (
 )
 
 var (
-	searchInNotes      bool
+	searchInNotes       bool
 	searchIncludeFuture bool
 )
 

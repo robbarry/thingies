@@ -101,6 +101,13 @@ func (s *Server) handleUpdateTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	resolved, err := s.db.ResolveTaskUUID(uuid)
+	if err != nil {
+		writeError(w, http.StatusNotFound, err.Error())
+		return
+	}
+	uuid = resolved
+
 	var req TaskUpdateRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request body: "+err.Error())
@@ -142,6 +149,13 @@ func (s *Server) handleCompleteTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	resolved, err := s.db.ResolveTaskUUID(uuid)
+	if err != nil {
+		writeError(w, http.StatusNotFound, err.Error())
+		return
+	}
+	uuid = resolved
+
 	if err := things.CompleteTask(uuid); err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to complete task: "+err.Error())
 		return
@@ -157,6 +171,13 @@ func (s *Server) handleCancelTask(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "task UUID is required")
 		return
 	}
+
+	resolved, err := s.db.ResolveTaskUUID(uuid)
+	if err != nil {
+		writeError(w, http.StatusNotFound, err.Error())
+		return
+	}
+	uuid = resolved
 
 	if err := things.CancelTask(uuid); err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to cancel task: "+err.Error())
@@ -174,6 +195,13 @@ func (s *Server) handleDeleteTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	resolved, err := s.db.ResolveTaskUUID(uuid)
+	if err != nil {
+		writeError(w, http.StatusNotFound, err.Error())
+		return
+	}
+	uuid = resolved
+
 	if err := things.DeleteTask(uuid); err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to delete task: "+err.Error())
 		return
@@ -190,6 +218,13 @@ func (s *Server) handleMoveTaskToToday(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	resolved, err := s.db.ResolveTaskUUID(uuid)
+	if err != nil {
+		writeError(w, http.StatusNotFound, err.Error())
+		return
+	}
+	uuid = resolved
+
 	if err := things.MoveTaskToToday(uuid); err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to move task to today: "+err.Error())
 		return
@@ -205,6 +240,13 @@ func (s *Server) handleMoveTaskToSomeday(w http.ResponseWriter, r *http.Request)
 		writeError(w, http.StatusBadRequest, "task UUID is required")
 		return
 	}
+
+	resolved, err := s.db.ResolveTaskUUID(uuid)
+	if err != nil {
+		writeError(w, http.StatusNotFound, err.Error())
+		return
+	}
+	uuid = resolved
 
 	// Use UpdateTask with When="someday" which moves to the Someday list
 	params := things.TaskUpdateParams{

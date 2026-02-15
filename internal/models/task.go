@@ -7,22 +7,22 @@ import (
 
 // Task represents a Things 3 task
 type Task struct {
-	UUID        string         `json:"uuid"`
-	Title       string         `json:"title"`
-	Notes       sql.NullString `json:"notes,omitempty"`
-	Status      TaskStatus     `json:"status"`
-	Type        TaskType       `json:"type"`
-	Created     sql.NullTime   `json:"created,omitempty"`
-	Modified    sql.NullTime   `json:"modified,omitempty"`
-	Scheduled   sql.NullTime   `json:"scheduled,omitempty"`
-	Deadline    sql.NullTime   `json:"due,omitempty"`
-	Completed   sql.NullTime   `json:"completed,omitempty"`
-	AreaName    sql.NullString `json:"area_name,omitempty"`
-	ProjectUUID sql.NullString `json:"project_uuid,omitempty"`
-	ProjectName sql.NullString `json:"project_name,omitempty"`
-	HeadingUUID sql.NullString `json:"heading_uuid,omitempty"`
-	HeadingName sql.NullString `json:"heading_name,omitempty"`
-	Tags        sql.NullString `json:"tags,omitempty"`
+	UUID           string          `json:"uuid"`
+	Title          string          `json:"title"`
+	Notes          sql.NullString  `json:"notes,omitempty"`
+	Status         TaskStatus      `json:"status"`
+	Type           TaskType        `json:"type"`
+	Created        sql.NullTime    `json:"created,omitempty"`
+	Modified       sql.NullTime    `json:"modified,omitempty"`
+	Scheduled      sql.NullTime    `json:"scheduled,omitempty"`
+	Deadline       sql.NullTime    `json:"due,omitempty"`
+	Completed      sql.NullTime    `json:"completed,omitempty"`
+	AreaName       sql.NullString  `json:"area_name,omitempty"`
+	ProjectUUID    sql.NullString  `json:"project_uuid,omitempty"`
+	ProjectName    sql.NullString  `json:"project_name,omitempty"`
+	HeadingUUID    sql.NullString  `json:"heading_uuid,omitempty"`
+	HeadingName    sql.NullString  `json:"heading_name,omitempty"`
+	Tags           sql.NullString  `json:"tags,omitempty"`
 	IsRepeating    bool            `json:"is_repeating"`
 	TodayIndex     sql.NullInt64   `json:"today_index,omitempty"`
 	ChecklistItems []ChecklistItem `json:"checklist_items,omitempty"`
@@ -30,21 +30,21 @@ type Task struct {
 
 // TaskJSON is the JSON-serializable version of Task
 type TaskJSON struct {
-	UUID        string `json:"uuid"`
-	Title       string `json:"title"`
-	Notes       string `json:"notes,omitempty"`
-	Status      string `json:"status"`
-	Type        string `json:"type"`
-	Created     string `json:"created,omitempty"`
-	Modified    string `json:"modified,omitempty"`
-	Scheduled   string `json:"scheduled,omitempty"`
-	Due         string `json:"due,omitempty"`
-	Completed   string `json:"completed,omitempty"`
-	AreaName    string `json:"area_name,omitempty"`
-	ProjectUUID string `json:"project_uuid,omitempty"`
-	ProjectName string `json:"project_name,omitempty"`
-	HeadingUUID string `json:"heading_uuid,omitempty"`
-	HeadingName string `json:"heading_name,omitempty"`
+	UUID           string          `json:"uuid"`
+	Title          string          `json:"title"`
+	Notes          string          `json:"notes,omitempty"`
+	Status         string          `json:"status"`
+	Type           string          `json:"type"`
+	Created        string          `json:"created,omitempty"`
+	Modified       string          `json:"modified,omitempty"`
+	Scheduled      string          `json:"scheduled,omitempty"`
+	Due            string          `json:"due,omitempty"`
+	Completed      string          `json:"completed,omitempty"`
+	AreaName       string          `json:"area_name,omitempty"`
+	ProjectUUID    string          `json:"project_uuid,omitempty"`
+	ProjectName    string          `json:"project_name,omitempty"`
+	HeadingUUID    string          `json:"heading_uuid,omitempty"`
+	HeadingName    string          `json:"heading_name,omitempty"`
 	Tags           string          `json:"tags,omitempty"`
 	IsRepeating    bool            `json:"is_repeating"`
 	ChecklistItems []ChecklistItem `json:"checklist_items,omitempty"`
@@ -53,21 +53,21 @@ type TaskJSON struct {
 // ToJSON converts Task to its JSON-serializable form
 func (t *Task) ToJSON() TaskJSON {
 	return TaskJSON{
-		UUID:        t.UUID,
-		Title:       t.Title,
-		Notes:       nullString(t.Notes),
-		Status:      t.Status.String(),
-		Type:        t.Type.String(),
-		Created:     formatTime(t.Created),
-		Modified:    formatTime(t.Modified),
-		Scheduled:   formatTime(t.Scheduled),
-		Due:         formatTime(t.Deadline),
-		Completed:   formatTime(t.Completed),
-		AreaName:    nullString(t.AreaName),
-		ProjectUUID: nullString(t.ProjectUUID),
-		ProjectName: nullString(t.ProjectName),
-		HeadingUUID: nullString(t.HeadingUUID),
-		HeadingName: nullString(t.HeadingName),
+		UUID:           t.UUID,
+		Title:          t.Title,
+		Notes:          nullString(t.Notes),
+		Status:         t.Status.String(),
+		Type:           t.Type.String(),
+		Created:        formatTime(t.Created),
+		Modified:       formatTime(t.Modified),
+		Scheduled:      formatTime(t.Scheduled),
+		Due:            formatTime(t.Deadline),
+		Completed:      formatTime(t.Completed),
+		AreaName:       nullString(t.AreaName),
+		ProjectUUID:    nullString(t.ProjectUUID),
+		ProjectName:    nullString(t.ProjectName),
+		HeadingUUID:    nullString(t.HeadingUUID),
+		HeadingName:    nullString(t.HeadingName),
 		Tags:           nullString(t.Tags),
 		IsRepeating:    t.IsRepeating,
 		ChecklistItems: t.ChecklistItems,
