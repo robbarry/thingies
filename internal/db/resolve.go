@@ -1,8 +1,10 @@
 package db
 
 import (
+	"database/sql"
 	"fmt"
 	"regexp"
+	"strings"
 )
 
 // uuidPattern matches Things UUIDs: 22-character base62 alphanumeric strings
@@ -82,15 +84,24 @@ func (db *ThingsDB) ResolveProjectID(nameOrUUID string) (string, error) {
 		// Verify the UUID exists
 		var exists int
 		err := db.conn.QueryRow(`SELECT 1 FROM TMTask WHERE uuid = ? AND type = 1 AND trashed = 0`, nameOrUUID).Scan(&exists)
-		if err != nil {
+		if err == sql.ErrNoRows {
 			return "", fmt.Errorf("project not found: %s", nameOrUUID)
+		}
+		if err != nil {
+			return "", fmt.Errorf("failed to query project: %w", err)
 		}
 		return nameOrUUID, nil
 	}
 
 	// Try short UUID prefix resolution first
-	if resolved, err := db.ResolveProjectUUID(nameOrUUID); err == nil {
+	resolved, err := db.ResolveProjectUUID(nameOrUUID)
+	if err == nil {
 		return resolved, nil
+	}
+	// Only fall through to name lookup for "not found" errors;
+	// surface ambiguous prefix and DB errors immediately
+	if !strings.Contains(err.Error(), "not found") {
+		return "", err
 	}
 
 	// Fall back to name lookup
@@ -104,15 +115,24 @@ func (db *ThingsDB) ResolveAreaID(nameOrUUID string) (string, error) {
 		// Verify the UUID exists
 		var exists int
 		err := db.conn.QueryRow(`SELECT 1 FROM TMArea WHERE uuid = ?`, nameOrUUID).Scan(&exists)
-		if err != nil {
+		if err == sql.ErrNoRows {
 			return "", fmt.Errorf("area not found: %s", nameOrUUID)
+		}
+		if err != nil {
+			return "", fmt.Errorf("failed to query area: %w", err)
 		}
 		return nameOrUUID, nil
 	}
 
 	// Try short UUID prefix resolution first
-	if resolved, err := db.ResolveAreaUUID(nameOrUUID); err == nil {
+	resolved, err := db.ResolveAreaUUID(nameOrUUID)
+	if err == nil {
 		return resolved, nil
+	}
+	// Only fall through to name lookup for "not found" errors;
+	// surface ambiguous prefix and DB errors immediately
+	if !strings.Contains(err.Error(), "not found") {
+		return "", err
 	}
 
 	// Fall back to name lookup

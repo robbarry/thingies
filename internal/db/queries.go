@@ -3,11 +3,15 @@ package db
 import (
 	"database/sql"
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 
 	"thingies/internal/models"
 )
+
+// prefixPattern matches valid UUID prefix characters (alphanumeric only)
+var prefixPattern = regexp.MustCompile(`^[0-9A-Za-z]+$`)
 
 // TaskFilter contains filters for listing tasks
 type TaskFilter struct {
@@ -904,13 +908,16 @@ func (db *ThingsDB) ResolveTaskUUID(prefix string) (string, error) {
 		// Full UUID, verify it exists
 		var exists int
 		err := db.conn.QueryRow(`SELECT 1 FROM TMTask WHERE uuid = ? AND type = 0`, prefix).Scan(&exists)
-		if err != nil {
+		if err == sql.ErrNoRows {
 			return "", fmt.Errorf("task not found: %s", prefix)
+		}
+		if err != nil {
+			return "", fmt.Errorf("failed to query task: %w", err)
 		}
 		return prefix, nil
 	}
 
-	query := `SELECT uuid FROM TMTask WHERE uuid LIKE ? || '%' AND type = 0`
+	query := `SELECT uuid FROM TMTask WHERE uuid LIKE ? || '%' AND type = 0 LIMIT 2`
 	return resolvePrefix(db, query, prefix, "task")
 }
 
@@ -920,13 +927,16 @@ func (db *ThingsDB) ResolveProjectUUID(prefix string) (string, error) {
 	if len(prefix) >= 22 {
 		var exists int
 		err := db.conn.QueryRow(`SELECT 1 FROM TMTask WHERE uuid = ? AND type = 1 AND trashed = 0`, prefix).Scan(&exists)
-		if err != nil {
+		if err == sql.ErrNoRows {
 			return "", fmt.Errorf("project not found: %s", prefix)
+		}
+		if err != nil {
+			return "", fmt.Errorf("failed to query project: %w", err)
 		}
 		return prefix, nil
 	}
 
-	query := `SELECT uuid FROM TMTask WHERE uuid LIKE ? || '%' AND type = 1 AND trashed = 0`
+	query := `SELECT uuid FROM TMTask WHERE uuid LIKE ? || '%' AND type = 1 AND trashed = 0 LIMIT 2`
 	return resolvePrefix(db, query, prefix, "project")
 }
 
@@ -936,13 +946,16 @@ func (db *ThingsDB) ResolveAreaUUID(prefix string) (string, error) {
 	if len(prefix) >= 22 {
 		var exists int
 		err := db.conn.QueryRow(`SELECT 1 FROM TMArea WHERE uuid = ?`, prefix).Scan(&exists)
-		if err != nil {
+		if err == sql.ErrNoRows {
 			return "", fmt.Errorf("area not found: %s", prefix)
+		}
+		if err != nil {
+			return "", fmt.Errorf("failed to query area: %w", err)
 		}
 		return prefix, nil
 	}
 
-	query := `SELECT uuid FROM TMArea WHERE uuid LIKE ? || '%'`
+	query := `SELECT uuid FROM TMArea WHERE uuid LIKE ? || '%' LIMIT 2`
 	return resolvePrefix(db, query, prefix, "area")
 }
 
@@ -952,13 +965,16 @@ func (db *ThingsDB) ResolveTagUUID(prefix string) (string, error) {
 	if len(prefix) >= 22 {
 		var exists int
 		err := db.conn.QueryRow(`SELECT 1 FROM TMTag WHERE uuid = ?`, prefix).Scan(&exists)
-		if err != nil {
+		if err == sql.ErrNoRows {
 			return "", fmt.Errorf("tag not found: %s", prefix)
+		}
+		if err != nil {
+			return "", fmt.Errorf("failed to query tag: %w", err)
 		}
 		return prefix, nil
 	}
 
-	query := `SELECT uuid FROM TMTag WHERE uuid LIKE ? || '%'`
+	query := `SELECT uuid FROM TMTag WHERE uuid LIKE ? || '%' LIMIT 2`
 	return resolvePrefix(db, query, prefix, "tag")
 }
 
@@ -968,19 +984,29 @@ func (db *ThingsDB) ResolveHeadingUUID(prefix string) (string, error) {
 	if len(prefix) >= 22 {
 		var exists int
 		err := db.conn.QueryRow(`SELECT 1 FROM TMTask WHERE uuid = ? AND type = 2`, prefix).Scan(&exists)
-		if err != nil {
+		if err == sql.ErrNoRows {
 			return "", fmt.Errorf("heading not found: %s", prefix)
+		}
+		if err != nil {
+			return "", fmt.Errorf("failed to query heading: %w", err)
 		}
 		return prefix, nil
 	}
 
-	query := `SELECT uuid FROM TMTask WHERE uuid LIKE ? || '%' AND type = 2`
+	query := `SELECT uuid FROM TMTask WHERE uuid LIKE ? || '%' AND type = 2 LIMIT 2`
 	return resolvePrefix(db, query, prefix, "heading")
 }
 
 // resolvePrefix is a shared helper for resolving a short UUID prefix to a full UUID.
 // The query must select UUIDs with a single ? placeholder for the prefix.
 func resolvePrefix(db *ThingsDB, query, prefix, entityType string) (string, error) {
+	if prefix == "" {
+		return "", fmt.Errorf("%s prefix cannot be empty", entityType)
+	}
+	if !prefixPattern.MatchString(prefix) {
+		return "", fmt.Errorf("invalid %s prefix: %s (must be alphanumeric)", entityType, prefix)
+	}
+
 	rows, err := db.conn.Query(query, prefix)
 	if err != nil {
 		return "", fmt.Errorf("failed to query %s: %w", entityType, err)
@@ -994,6 +1020,9 @@ func resolvePrefix(db *ThingsDB, query, prefix, entityType string) (string, erro
 			return "", err
 		}
 		uuids = append(uuids, uuid)
+	}
+	if err := rows.Err(); err != nil {
+		return "", fmt.Errorf("failed to iterate %s results: %w", entityType, err)
 	}
 
 	if len(uuids) == 0 {
