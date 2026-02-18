@@ -1,6 +1,7 @@
 package server
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -60,12 +61,11 @@ func TestCreateTaskRejectsUnknownFields(t *testing.T) {
 	}
 }
 
-// TestCreateTaskAcceptsValidFields verifies that POST /tasks does NOT reject
-// a request that only contains known fields. We don't need Things to actually
-// create the task — we just verify the handler doesn't return 400 for valid input.
+// TestCreateTaskAcceptsValidFields verifies that valid JSON fields decode
+// without error when DisallowUnknownFields is enabled. This tests the decode
+// path directly to avoid side effects (the handler calls things.OpenURL which
+// launches external apps).
 func TestCreateTaskAcceptsValidFields(t *testing.T) {
-	s := &Server{}
-
 	tests := []struct {
 		name string
 		body string
@@ -86,17 +86,11 @@ func TestCreateTaskAcceptsValidFields(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			req := httptest.NewRequest(http.MethodPost, "/tasks", strings.NewReader(tt.body))
-			req.Header.Set("Content-Type", "application/json")
-			w := httptest.NewRecorder()
-
-			s.handleCreateTask(w, req)
-
-			// Should NOT be 400 — any other status means the body was accepted.
-			// It may fail later (e.g., 500 because Things isn't running), but
-			// the point is it shouldn't be rejected as invalid input.
-			if w.Code == http.StatusBadRequest {
-				t.Errorf("valid fields should not be rejected, got 400; body: %s", w.Body.String())
+			decoder := json.NewDecoder(strings.NewReader(tt.body))
+			decoder.DisallowUnknownFields()
+			var req TaskCreateRequest
+			if err := decoder.Decode(&req); err != nil {
+				t.Errorf("valid fields should decode without error, got: %v", err)
 			}
 		})
 	}
