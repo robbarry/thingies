@@ -64,7 +64,9 @@ func writeSuccess(w http.ResponseWriter, message string) {
 // handleCreateTask handles POST /tasks
 func (s *Server) handleCreateTask(w http.ResponseWriter, r *http.Request) {
 	var req TaskCreateRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request body: "+err.Error())
 		return
 	}
