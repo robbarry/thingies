@@ -119,18 +119,26 @@ areas → area, a          tags → tag
 snapshot → all
 ```
 
-### Name Resolution
-Most commands accept either a UUID or a name for areas/projects. Names are resolved to UUIDs automatically; if multiple items match a name, you'll be prompted to use the UUID instead.
+### Name and UUID Resolution
+Most commands accept either a UUID, a short UUID prefix, or a name for areas/projects. Resolution order:
+1. Full UUID (22 alphanumeric chars) -- verified directly
+2. Short UUID prefix (any alphanumeric prefix) -- matched via `LIKE prefix%`; errors on ambiguous matches
+3. Name lookup (for projects and areas only)
+
+Short prefixes work in both CLI commands and REST API endpoints. The API resolves short UUIDs in path parameters (e.g., `GET /tasks/abc123` resolves to the full UUID).
+
+Delete commands execute immediately without confirmation prompts.
 
 ## Architecture
 
 ### Key Packages
-- `internal/cmd/` - Cobra commands organized by resource (`tasks/`, `projects/`, `areas/`, `tags/`) plus view commands (`today.go`, `inbox.go`, `upcoming.go`, `someday.go`, `anytime.go`, `logbook.go`)
-- `internal/db/` - SQLite database layer: `db.go` (connection), `queries.go` (SQL), `scanner.go` (row scanning), `resolve.go` (name→UUID resolution)
-- `internal/server/` - HTTP REST API server using Go 1.22+ `ServeMux` routing patterns (`GET /tasks/{uuid}`)
+- `internal/cmd/` - Cobra commands organized by resource (`tasks/`, `projects/`, `areas/`, `tags/`) plus view commands (`today.go`, `inbox.go`, `upcoming.go`, `someday.go`, `anytime.go`, `logbook.go`). The `serve` command registers itself via `init()` in `serve.go`.
+- `internal/db/` - SQLite database layer: `db.go` (connection), `queries.go` (SQL + UUID prefix resolution), `scanner.go` (row scanning), `resolve.go` (name/UUID resolution with fallback chain)
+- `internal/server/` - HTTP REST API server using Go 1.22+ `ServeMux` routing patterns (`GET /tasks/{uuid}`). Handlers split across: `handlers_tasks.go` (list/get/search), `tasks.go` (create/update/delete + request types), `handlers_views.go` (today/inbox/etc.), `headings.go`
 - `internal/things/` - Things 3 integration: `urlscheme.go` (URL builder), `applescript.go` (osascript), `opener.go` (macOS open)
-- `internal/models/` - Data models: Task, Project, Area, Tag, Heading, ChecklistItem
+- `internal/models/` - Data models: Task, Project, Area, Tag, Heading, ChecklistItem. Each model has a `ToJSON()` method producing a clean serializable struct.
 - `internal/output/` - Formatters: table (lipgloss) and JSON
+- `internal/cmd/shared/` - Flag propagation helpers (`GetDBPath`, `IsJSON`, `GetFormatter`) that walk the command tree to find persistent flags
 
 ### Database
 - Path: `~/Library/Group Containers/JLMPQHK86H.com.culturedcode.ThingsMac/ThingsData-*/Things Database.thingsdatabase/main.sqlite`
@@ -178,9 +186,10 @@ things:///update?id=UUID&auth-token=TOKEN&when=2026-03-15
 The `serve` command starts an HTTP server (default port 8484). All responses are JSON. CORS is enabled (`*` origin) for local development.
 
 **Views:**
-- `GET /today`, `/inbox`, `/upcoming`, `/someday`, `/anytime`, `/logbook`
-- `GET /deadlines` - API-only (no CLI equivalent), returns tasks with upcoming deadlines
-- `GET /snapshot` - Full hierarchical view as JSON
+- `GET /today`, `/inbox`, `/upcoming`, `/someday`, `/anytime`
+- `GET /logbook` - Completed tasks (query param: `limit`, default 50)
+- `GET /deadlines` - API-only (no CLI equivalent), returns tasks with upcoming deadlines (query param: `days`, default 7)
+- `GET /snapshot` - Full hierarchical view as JSON text (sections: TODAY, ANYTIME, UPCOMING, SOMEDAY, INBOX)
 
 **Tasks:**
 - `GET /tasks` - List tasks (query params: `status`, `area`, `project`, `tag`, `today`, `include-future`)
@@ -206,6 +215,15 @@ The `serve` command starts an HTTP server (default port 8484). All responses are
 **Health:**
 - `GET /health`
 
+## Testing Patterns
+
+Tests avoid side effects from Things 3 integration (AppleScript, URL scheme). Common approaches:
+- **Server handler tests**: Use `httptest.NewRequest` and `httptest.NewRecorder` to test handlers directly without a running server or database
+- **Convention enforcement**: AST-based tests parse source files to verify constraints (e.g., `delete.go` must not import `bufio` or reference `os.Stdin`, ensuring no interactive prompts)
+- **Decode-only tests**: Test JSON decoding paths separately from handler side effects to avoid launching external apps
+
+Tests are sparse -- mainly covering recent regressions and conventions. No mocking framework; tests either parse the source AST or test isolated decode logic.
+
 ## Gotchas
 
 - **Area visibility**: `visible = NULL` means visible (not `visible = 1`)
@@ -216,6 +234,7 @@ The `serve` command starts an HTTP server (default port 8484). All responses are
 - **Repeating tasks**: `rt1_repeatingTemplate IS NOT NULL`; future instances filtered by default, use `--include-future`
 - **Start field values**: `0` = Inbox, `1` = Anytime, `2` = Someday (scheduled or deferred)
 - **No CGO**: Uses `modernc.org/sqlite` pure Go driver (no C compiler needed)
+- **Duplicate helper names**: The server package has two sets of `writeJSON`/`writeError` -- one set as package-level functions in `tasks.go` (used by create/update/delete handlers, returns `APIResponse` struct) and one set as methods on `Server` in `handlers_tasks.go` (used by list/get/search handlers, returns raw JSON). New handlers should use the `Server` method variants (`s.writeJSON`, `s.writeError`).
 - **Shell completions**: `thingies completion bash/zsh/fish`
 - **Go version**: Requires Go 1.21+ (current: 1.25.5 per go.mod)
 

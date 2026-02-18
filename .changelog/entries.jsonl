@@ -1,3 +1,8 @@
+{"date": "2026-02-18", "category": "Changed", "description": "Delete commands for tasks, projects, areas, and tags no longer prompt for interactive confirmation", "commits": ["6377ff9", "c1aec9e", "19b28b5", "466e04c"]}
+{"date": "2026-02-18", "category": "Added", "description": "POST /tasks now rejects unknown JSON fields with a 400 error instead of silently ignoring them", "commits": ["5ff910a"]}
+{"date": "2026-02-18", "category": "Fixed", "description": "Non-hermetic test in `tasks_create_test.go` that could launch the Things app during test runs", "commits": ["45e91f5"]}
+{"date": "2026-02-15", "category": "Changed", "description": "Short UUID prefix resolution extended to all commands and API endpoints (projects, areas, tags), not just tasks", "commits": ["63ae6ef"]}
+{"date": "2026-02-15", "category": "Fixed", "description": "Error handling in UUID resolution now correctly distinguishes between not-found and ambiguous prefix matches", "commits": ["333a5ef"]}
 {"date": "2026-02-10", "category": "Fixed", "description": "`--tag` filter on task list returning empty results due to referencing unavailable column alias in HAVING clause", "commits": ["4aa770e"]}
 {"date": "2026-02-07", "category": "Added", "description": "Specific date scheduling (YYYY-MM-DD) in `tasks update --when`, using Things URL scheme with auth token for dates AppleScript can't set", "commits": ["3957017"]}
 {"date": "2026-02-07", "category": "Changed", "description": "GetAuthToken now reads `uriSchemeAuthenticationToken` column directly instead of attempting plist parsing", "commits": ["3957017"]}

@@ -1,6 +1,8 @@
 # Thingies
 
-A Go CLI and REST API for Things 3 with full CRUD access.
+A Go CLI and REST API for [Things 3](https://culturedcode.com/things/) with full CRUD access.
+
+Reads are fast -- they go straight to the Things 3 SQLite database without launching the app. Creates use the Things URL scheme. Updates, deletes, and completions go through AppleScript. The REST API wraps all of this behind a JSON HTTP server.
 
 ## Requirements
 
@@ -10,13 +12,13 @@ A Go CLI and REST API for Things 3 with full CRUD access.
 ## Install
 
 ```bash
-make install  # builds and copies to /usr/local/bin
+make install    # builds and copies to /usr/local/bin
 ```
 
 Or build without installing:
 
 ```bash
-make build    # outputs to bin/thingies
+make build      # outputs to bin/thingies
 ```
 
 ## CLI Usage
@@ -38,7 +40,7 @@ thingies snapshot           # Hierarchical view (areas -> projects -> tasks)
 ```bash
 thingies search "keyword"
 thingies search "keyword" --in-notes        # Also search notes
-thingies search "keyword" --include-future  # Include future repeating task instances
+thingies search "keyword" --include-future   # Include future repeating task instances
 ```
 
 ### Tasks
@@ -73,7 +75,7 @@ The `--when` flag accepts: `today`, `tomorrow`, `evening`, `anytime`, `someday`,
 thingies projects list
 thingies projects show <uuid>
 thingies projects create "New project" --area "Work" --todos "Task 1\nTask 2"
-thingies projects create "New project" --deadline 2026-03-01  # With due date
+thingies projects create "New project" --deadline 2026-03-01
 thingies projects update <uuid> --notes "# Markdown supported"
 thingies projects update <uuid> --deadline 2026-03-01
 thingies projects complete <uuid>
@@ -103,21 +105,33 @@ thingies tags delete <uuid>
 ### Global Flags
 
 ```
---db, -d     Path to Things database (default: auto-detect)
---json, -j   Output as JSON
---no-color   Disable colors
---verbose    Verbose output
+--db, -d       Path to Things database (default: auto-detect)
+--json, -j     Output as JSON
+--no-color     Disable colors
+--verbose, -v  Verbose output
 ```
 
-### Name Resolution
+### Command Aliases
 
-Most commands accept either a UUID or a name for areas/projects. Names are resolved to UUIDs automatically; if multiple items share a name, you'll be prompted to use the UUID.
+```
+tasks    -> task, t
+projects -> project, p
+areas    -> area, a
+tags     -> tag
+snapshot -> all
+```
+
+### Name and UUID Resolution
+
+Most commands accept either a full UUID or a name for areas and projects. Names are resolved to UUIDs automatically. If multiple items share the same name, you'll be prompted to use the UUID instead.
+
+Short UUID prefixes also work -- you can pass the first few characters of a UUID and thingies will resolve it as long as the prefix is unambiguous.
 
 ## REST API
 
 ```bash
-thingies serve              # Start on 0.0.0.0:8484
-thingies serve -p 3000      # Custom port
+thingies serve                   # Start on 0.0.0.0:8484
+thingies serve -p 3000           # Custom port
 thingies serve --host 127.0.0.1  # Localhost only
 ```
 
@@ -133,7 +147,7 @@ All responses are JSON. CORS is enabled for all origins.
 - `GET /anytime` - Anytime tasks
 - `GET /logbook` - Completed tasks (query: `limit`, default 50)
 - `GET /deadlines` - Tasks with upcoming deadlines (query: `days`, default 7)
-- `GET /snapshot` - Full hierarchical view as text
+- `GET /snapshot` - Full hierarchical view
 
 **Tasks:**
 - `GET /tasks` - List tasks (query: `status`, `area`, `project`, `tag`, `today`, `include-future`)
@@ -173,12 +187,12 @@ All responses are JSON. CORS is enabled for all origins.
 
 ## How It Works
 
-- **Reads**: Direct SQLite access to the Things 3 database (fast, no app launch needed)
-- **Creates**: Things URL scheme (`things:///add`, `things:///add-project`)
-- **Updates/Deletes/Completes**: AppleScript via `osascript`
-- **Specific date scheduling**: Things URL scheme with auth token (AppleScript cannot set activation dates)
+- **Reads** go directly to the Things 3 SQLite database (read-only, no app launch needed)
+- **Creates** use the Things URL scheme (`things:///add`, `things:///add-project`)
+- **Updates/Deletes/Completes** use AppleScript via `osascript`
+- **Specific date scheduling** uses the Things URL scheme with an auth token (AppleScript cannot set activation dates)
 
-The database is accessed read-only using a pure Go SQLite driver (no CGO required). The database path is auto-detected from the standard Things 3 location.
+The database is accessed read-only using a pure Go SQLite driver (`modernc.org/sqlite` -- no CGO required). The database path is auto-detected from the standard Things 3 location.
 
 ## Shell Completions
 
